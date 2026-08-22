@@ -1,0 +1,7 @@
+{
+    "name": "medinexus-frontend",
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "echo 'Frontend container running. Awaiting Kunjan React build...' && tail -f /dev/null"
+    }
+}

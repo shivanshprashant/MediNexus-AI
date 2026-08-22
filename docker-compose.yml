@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: medinexus_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: securepassword123
+      POSTGRES_DB: medinexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - medinexus_network
+
+  backend:
+    build: ./backend
+    container_name: medinexus_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:securepassword123@db:5432/medinexus
+    depends_on:
+      - db
+    networks:
+      - medinexus_network
+
+  frontend:
+    build: ./frontend
+    container_name: medinexus_frontend
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    networks:
+      - medinexus_network
+
+volumes:
+  postgres_data:
+
+networks:
+  medinexus_network:
+    driver: bridge
