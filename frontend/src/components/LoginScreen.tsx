@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { UserRole } from '../types';
 
 interface LoginScreenProps {
-  onLoginSuccess: (role: 'doctor' | 'patient', userName: string) => void;
+  onLoginSuccess: (role: 'doctor' | 'patient' | 'hospital_admin', userName: string) => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const [step, setStep] = useState<'role' | 'doctor-form' | 'patient-form' | 'authenticating'>('role');
-  const [pendingRole, setPendingRole] = useState<'doctor' | 'patient'>('doctor');
+  const [step, setStep] = useState<
+    'role' | 'doctor-form' | 'patient-form' | 'admin-form' | 'authenticating'
+  >('role');
+  const [pendingRole, setPendingRole] = useState<'doctor' | 'patient' | 'hospital_admin'>('doctor');
   const [showDoctorPwd, setShowDoctorPwd] = useState(false);
   const [showPatientPwd, setShowPatientPwd] = useState(false);
+  const [showAdminPwd, setShowAdminPwd] = useState(false);
 
   // Form states
   const [doctorName, setDoctorName] = useState('Dr. Shiv Gupta');
@@ -23,9 +26,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [patientBloodGroup, setPatientBloodGroup] = useState('O+');
   const [patientPassword, setPatientPassword] = useState('••••••••');
 
+  // Admin form state
+  const [adminName, setAdminName] = useState('Admin Rajesh Sharma');
+  const [adminHospitalCode, setAdminHospitalCode] = useState('HSP-001');
+  const [adminEmail, setAdminEmail] = useState('admin@citycare.org');
+  const [adminPassword, setAdminPassword] = useState('••••••••••••');
+
   const [authProgress, setAuthProgress] = useState(false);
 
-  const startAuthSimulation = (role: 'doctor' | 'patient', name: string) => {
+  const startAuthSimulation = (role: 'doctor' | 'patient' | 'hospital_admin', name: string) => {
     setPendingRole(role);
     setStep('authenticating');
     setAuthProgress(false);
@@ -46,6 +55,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handlePatientSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     startAuthSimulation('patient', patientName);
+  };
+
+  const handleAdminSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    startAuthSimulation('hospital_admin', adminName);
   };
 
   const bloodGroups = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'];
@@ -72,7 +86,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       <main className="w-full max-w-[400px] mx-auto px-5 py-4 flex-1 flex flex-col justify-center">
         {/* STEP 1: Role Selection */}
         {step === 'role' && (
-          <section className="w-full flex flex-col gap-3.5 animate-in fade-in duration-200">
+          <section className="w-full flex flex-col gap-3 animate-in fade-in duration-200">
             <div className="text-center mb-1">
               <h2 className="text-lg font-semibold text-[#182a24]">Login as</h2>
               <p className="text-xs text-[#62766e] mt-0.5">Select your role to access your dedicated clinical station or portal</p>
@@ -81,36 +95,149 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             {/* Doctor Card */}
             <button
               onClick={() => setStep('doctor-form')}
-              className="w-full text-left bg-white border border-[#dce8dc] rounded-2xl p-5 shadow-sm hover:border-[#2d8a66] transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#2d8a66]/30 flex flex-col items-center text-center group cursor-pointer"
+              className="w-full text-left bg-white border border-[#dce8dc] rounded-2xl p-4 shadow-sm hover:border-[#2d8a66] transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#2d8a66]/30 flex items-center gap-3.5 group cursor-pointer"
               type="button"
             >
-              <div className="w-12 h-12 rounded-xl bg-[#edf6f0] border border-[#d6ebd9] flex items-center justify-center text-[#2d8a66] mb-3 group-hover:bg-[#e8f3ee] transition-colors">
-                <span className="material-symbols-outlined text-[24px]">stethoscope</span>
+              <div className="w-11 h-11 rounded-xl bg-[#edf6f0] border border-[#d6ebd9] flex items-center justify-center text-[#2d8a66] shrink-0 group-hover:bg-[#e8f3ee] transition-colors">
+                <span className="material-symbols-outlined text-[22px]">stethoscope</span>
               </div>
-              <span className="text-base font-bold text-gray-900 tracking-tight">Doctor</span>
-              <span className="text-xs text-[#62766e] mt-1 leading-relaxed px-2">Clinical triage, queue & consultations</span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2d8a66] mt-3">
-                Continue
-                <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              </span>
+              <div className="flex-1">
+                <span className="text-sm font-bold text-gray-900 tracking-tight block">Doctor</span>
+                <span className="text-[11px] text-[#62766e] leading-snug block">Clinical triage, queue & consultations</span>
+              </div>
+              <span className="text-[#2d8a66] font-bold text-sm transition-transform group-hover:translate-x-0.5">→</span>
             </button>
 
             {/* Patient Card */}
             <button
               onClick={() => setStep('patient-form')}
-              className="w-full text-left bg-white border border-[#dce8dc] rounded-2xl p-5 shadow-sm hover:border-[#2d8a66] transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#2d8a66]/30 flex flex-col items-center text-center group cursor-pointer"
+              className="w-full text-left bg-white border border-[#dce8dc] rounded-2xl p-4 shadow-sm hover:border-[#2d8a66] transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#2d8a66]/30 flex items-center gap-3.5 group cursor-pointer"
               type="button"
             >
-              <div className="w-12 h-12 rounded-xl bg-[#edf6f0] border border-[#d6ebd9] flex items-center justify-center text-[#2d8a66] mb-3 group-hover:bg-[#e8f3ee] transition-colors">
-                <span className="material-symbols-outlined text-[24px]">person</span>
+              <div className="w-11 h-11 rounded-xl bg-[#edf6f0] border border-[#d6ebd9] flex items-center justify-center text-[#2d8a66] shrink-0 group-hover:bg-[#e8f3ee] transition-colors">
+                <span className="material-symbols-outlined text-[22px]">person</span>
               </div>
-              <span className="text-base font-bold text-gray-900 tracking-tight">Patient</span>
-              <span className="text-xs text-[#62766e] mt-1 leading-relaxed px-2">Personal health, appointments & SOS</span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2d8a66] mt-3">
-                Continue
-                <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              </span>
+              <div className="flex-1">
+                <span className="text-sm font-bold text-gray-900 tracking-tight block">Patient</span>
+                <span className="text-[11px] text-[#62766e] leading-snug block">Personal health, appointments & SOS</span>
+              </div>
+              <span className="text-[#2d8a66] font-bold text-sm transition-transform group-hover:translate-x-0.5">→</span>
             </button>
+
+            {/* Hospital Admin Card */}
+            <button
+              onClick={() => setStep('admin-form')}
+              className="w-full text-left bg-[#1b3b32] text-white border border-[#274f43] rounded-2xl p-4 shadow-sm hover:bg-[#122822] transition-all active:scale-[0.98] focus:outline-none flex items-center gap-3.5 group cursor-pointer"
+              type="button"
+            >
+              <div className="w-11 h-11 rounded-xl bg-[#254d41] border border-[#376b5b] flex items-center justify-center text-[#4edea3] shrink-0">
+                <span className="material-symbols-outlined text-[22px]">domain</span>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold tracking-tight block text-white">Hospital Admin</span>
+                  <span className="text-[9px] font-mono uppercase font-bold px-1.5 py-0.2 rounded bg-[#2c5b4d] text-[#8ce7be]">Registration / Setup</span>
+                </div>
+                <span className="text-[11px] text-[#a0c5b7] leading-snug block">Register hospital & operational control</span>
+              </div>
+              <span className="text-[#4edea3] font-bold text-sm transition-transform group-hover:translate-x-0.5">→</span>
+            </button>
+          </section>
+        )}
+
+        {/* STEP 2: Hospital Admin Registration & Login Form */}
+        {step === 'admin-form' && (
+          <section className="w-full bg-[#1b3b32] text-white border border-[#274f43] rounded-2xl p-5 shadow-md animate-in fade-in duration-200">
+            <div className="flex items-center justify-between border-b border-[#295649] pb-3 mb-4">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#4edea3] font-bold">
+                  Hospital Onboarding & Control
+                </span>
+                <h2 className="text-base font-bold text-white leading-tight">
+                  Hospital Admin Registration
+                </h2>
+              </div>
+              <button
+                onClick={() => setStep('role')}
+                className="text-xs text-[#a0c5b7] hover:text-white flex items-center gap-1 font-medium py-1 px-2.5 rounded-lg bg-[#20443a] border border-[#2d5c4f] active:bg-[#285246] transition-colors cursor-pointer"
+                type="button"
+              >
+                ← Back
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-[#c4e4d8] mb-1">
+                  Hospital Code / ID
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adminHospitalCode}
+                  onChange={(e) => setAdminHospitalCode(e.target.value.toUpperCase())}
+                  className="w-full text-sm font-mono uppercase rounded-xl border border-[#2f5c4e] focus:border-[#4edea3] bg-[#142d26] text-white py-2.5 px-3 outline-none"
+                  placeholder="HSP-001"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#c4e4d8] mb-1">
+                  Admin Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  className="w-full text-sm rounded-xl border border-[#2f5c4e] focus:border-[#4edea3] bg-[#142d26] text-white py-2.5 px-3 outline-none"
+                  placeholder="Admin Rajesh Sharma"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#c4e4d8] mb-1">
+                  Official Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  className="w-full text-sm rounded-xl border border-[#2f5c4e] focus:border-[#4edea3] bg-[#142d26] text-white py-2.5 px-3 outline-none"
+                  placeholder="admin@citycare.org"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-medium text-[#c4e4d8]">Admin Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPwd(!showAdminPwd)}
+                    className="text-[11px] text-[#4edea3] font-semibold hover:underline"
+                  >
+                    {showAdminPwd ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <input
+                  type={showAdminPwd ? 'text' : 'password'}
+                  required
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="w-full text-sm rounded-xl border border-[#2f5c4e] focus:border-[#4edea3] bg-[#142d26] text-white py-2.5 px-3 outline-none"
+                  placeholder="••••••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-2 py-3 px-4 rounded-xl bg-[#2b8a66] hover:bg-[#216b4f] active:scale-[0.98] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Continue to Hospital Console</span>
+                <span>→</span>
+              </button>
+            </form>
           </section>
         )}
 

@@ -1,7 +1,32 @@
 import React, { useState } from 'react';
-import { AppScreen, DoctorTab, PatientTab, Patient, Appointment, Specialist, NotificationItem, Hospital, ActiveSosState } from './types';
-import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS, SPECIALISTS, INITIAL_NOTIFICATIONS } from './data';
-import { LoginScreen } from './components/LoginScreen';
+import {
+  AppScreen,
+  DoctorTab,
+  PatientTab,
+  Patient,
+  Appointment,
+  Specialist,
+  NotificationItem,
+  Hospital,
+  ActiveSosState,
+  DoctorProfileInfo,
+  MedicalRecord,
+} from './types';
+import {
+  INITIAL_PATIENTS,
+  INITIAL_APPOINTMENTS,
+  SPECIALISTS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_MEDICAL_RECORDS,
+} from './data';
+
+// Auth & Landing Components
+import { LandingPage } from './components/LandingPage';
+import { LoginPage } from './components/LoginPage';
+import { PatientRegistrationWizard } from './components/patient/PatientRegistrationWizard';
+import { DoctorRegistrationWizard } from './components/doctor/DoctorRegistrationWizard';
+
+// Doctor & Patient Components
 import { DoctorHeader } from './components/doctor/DoctorHeader';
 import { DoctorNav } from './components/doctor/DoctorNav';
 import { DoctorDashboardView } from './components/doctor/DoctorDashboardView';
@@ -15,32 +40,58 @@ import { PatientDashboardView } from './components/patient/PatientDashboardView'
 import { BookAppointmentView } from './components/patient/BookAppointmentView';
 import { PatientProfileView } from './components/patient/PatientProfileView';
 import { PatientModals } from './components/patient/PatientModals';
+import { VideoConsultationRecommendationView } from './components/patient/VideoConsultationRecommendationView';
+import { EmergencyAssistanceView } from './components/patient/EmergencyAssistanceView';
+import { PatientMedicalRecordsView } from './components/patient/PatientMedicalRecordsView';
 
 export default function App() {
-  // Screen state: 'login' | 'doctor' | 'patient'
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('login');
+  // Screen state: 'landing' | 'login' | 'patient_register' | 'doctor_register' | 'doctor' | 'patient'
+  const getInitialScreen = (): AppScreen => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash.includes('doctor') || search.includes('doctor')) return 'doctor';
+      if (hash.includes('patient') || search.includes('patient')) return 'patient';
+    }
+    return 'landing';
+  };
+
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(getInitialScreen);
+
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('doctor')) setCurrentScreen('doctor');
+      else if (hash.includes('patient')) setCurrentScreen('patient');
+      else if (hash.includes('login')) setCurrentScreen('login');
+      else if (hash === '' || hash === '#landing') setCurrentScreen('landing');
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Sub-navigation state
   const [doctorTab, setDoctorTab] = useState<DoctorTab>('home');
   const [patientTab, setPatientTab] = useState<PatientTab>('home');
 
-  // Data states
+  // Data states (Doctor & Patient)
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
   const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
   const [specialists] = useState<Specialist[]>(SPECIALISTS);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(INITIAL_MEDICAL_RECORDS);
   const [urgentAcknowledged, setUrgentAcknowledged] = useState(false);
 
-  // Hospital Beds & Emergency SOS State
+  // Emergency SOS State for Patient
   const [hospitals, setHospitals] = useState<Hospital[]>([
     {
       id: 'hosp-1',
-      name: 'Apollo Hospitals, New Delhi',
+      name: 'CityCare Hospital (HSP-001)',
       dist: '1.8 km',
       time: '6 mins',
       traffic: 'Clear',
-      address: 'Sarita Vihar, Mathura Road, New Delhi',
-      phone: '+91 11 2692 5858',
+      address: 'Plot 14, Sector 44, New Delhi',
+      phone: '+91 11 4910 2000',
       vacantBeds: 5,
       totalBeds: 24,
       erStatus: 'LEVEL 1 TRAUMA • OPEN 24/7',
@@ -69,62 +120,79 @@ export default function App() {
       totalBeds: 20,
       erStatus: 'EMERGENCY BAY OPEN',
     },
+    {
+      id: 'hosp-4',
+      name: 'Apollo Hospital Emergency & Trauma, Sarita Vihar',
+      dist: '8.1 km',
+      time: '22 mins',
+      traffic: 'Clear',
+      address: 'Mathura Road, Sarita Vihar, New Delhi',
+      phone: '+91 11 2692 5858',
+      vacantBeds: 12,
+      totalBeds: 40,
+      erStatus: 'NEURO & CARDIAC ER 24/7',
+    },
+    {
+      id: 'hosp-5',
+      name: 'Medanta - The Medicity, Gurugram',
+      dist: '11.4 km',
+      time: '28 mins',
+      traffic: 'Moderate',
+      address: 'CH Baktawar Singh Road, Sector 38, Gurugram',
+      phone: '+91 124 414 1414',
+      vacantBeds: 15,
+      totalBeds: 50,
+      erStatus: 'MULTI-ORGAN TRAUMA CENTER',
+    },
   ]);
 
   const [activeSos, setActiveSos] = useState<ActiveSosState | null>(null);
 
+  // Toast feedback
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 3200);
+  };
+
   // Handlers for Emergency SOS
-  const handleTriggerPatientSOS = (mode: 'drive-in' | 'ambulance') => {
-    // 1. Allot ER Bed at Apollo Hospitals (hosp-1) & decrement vacant bed count
+  const handleTriggerPatientSOS = (mode: 'drive-in' | 'ambulance', targetHospitalId?: string) => {
+    const chosenHosp = hospitals.find((h) => h.id === targetHospitalId) || hospitals[0];
+
     setHospitals((prev) =>
-      prev.map((h) => (h.id === 'hosp-1' ? { ...h, vacantBeds: Math.max(0, h.vacantBeds - 1) } : h))
+      prev.map((h) => (h.id === chosenHosp.id ? { ...h, vacantBeds: Math.max(0, h.vacantBeds - 1) } : h))
     );
 
     const sosObj: ActiveSosState = {
       active: true,
       mode,
       patientName: 'Ananya Sharma',
-      hospitalId: 'hosp-1',
-      hospitalName: 'Apollo Hospitals, New Delhi',
+      hospitalId: chosenHosp.id,
+      hospitalName: chosenHosp.name,
       bedNo: 'ER Bed #04',
       status: 'en-route',
+      redirectedHospitalAddress: chosenHosp.address,
     };
     setActiveSos(sosObj);
 
-    // 2. Alert Doctor Station with Urgent Notification
-    const newNotif: NotificationItem = {
+    const newDoctorNotif: NotificationItem = {
       id: `notif-sos-${Date.now()}`,
       title: `CRITICAL SOS: Severe Patient Arriving (${mode === 'drive-in' ? 'Drive-In' : 'Ambulance'})`,
-      desc: `Ananya Sharma (29F) is arriving via ${mode === 'drive-in' ? 'Self/Family Transport Drive-In' : 'ALS Ambulance'}. ER Bed #04 Reserved at Apollo Hospitals.`,
+      desc: `Ananya Sharma (29F) arriving. ER Bed #04 Reserved at ${chosenHosp.name}.`,
       time: 'Just now',
       type: 'URGENT',
       unread: true,
-      patient: {
-        id: 'p-ananya-sos',
-        name: 'Ananya Sharma',
-        mrn: 'ABHA-MN-4091',
-        dept: 'Cardiology / Emergency',
-        age: 29,
-        gender: 'Female',
-        blood: 'O+',
-        priority: 'HIGH',
-        status: 'WAITING',
-        history: 'Severe chest tightness & acute distress',
-        allergies: 'Penicillin',
-        meds: 'None',
-        reason: 'CRITICAL SOS - Severe retrosternal discomfort on arrival',
-        recommendation: 'Prepare Trauma Bay 1. Stat ECG & Troponin I team ready.',
-        lastVisit: 'Today',
-        nextAppointment: 'Immediate ER Intake',
-      },
     };
+    setNotifications((prev) => [newDoctorNotif, ...prev]);
 
-    setNotifications((prev) => [newNotif, ...prev]);
-    setShowEmergencyModal(true); // Pop up Doctor Emergency Modal immediately!
+    setShowEmergencyModal(true);
     showToast(
       mode === 'drive-in'
-        ? 'Emergency Drive-In Route Active • ER Bed #04 Reserved'
-        : 'Emergency Ambulance Dispatched • ER Bed #04 Reserved'
+        ? `Emergency Drive-In Route Active • ${chosenHosp.name} ER Bed #04 Reserved`
+        : `Emergency Ambulance Dispatched • ${chosenHosp.name} ER Bed #04 Reserved`
     );
   };
 
@@ -138,8 +206,7 @@ export default function App() {
 
   const handleRedirectPatientEmergency = (targetHospitalId: string) => {
     const targetHosp = hospitals.find((h) => h.id === targetHospitalId) || hospitals[1];
-    
-    // Transfer bed reservation: restore Apollo bed count (+1) and decrement target hospital bed count (-1)
+
     setHospitals((prev) =>
       prev.map((h) => {
         if (h.id === 'hosp-1') return { ...h, vacantBeds: h.vacantBeds + 1 };
@@ -172,16 +239,6 @@ export default function App() {
     showToast('Emergency SOS session ended');
   };
 
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 3200);
-  };
-
   // Doctor Modals state
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [aiSummaryPatient, setAiSummaryPatient] = useState<Patient | null>(null);
@@ -192,23 +249,90 @@ export default function App() {
   const [rescheduleApt, setRescheduleApt] = useState<Appointment | null>(null);
   const [cancelApt, setCancelApt] = useState<Appointment | null>(null);
 
+  const [docProfile, setDocProfile] = useState<DoctorProfileInfo>({
+    name: 'Dr. Shiv Gupta, MD',
+    title: 'Senior Attending Cardiologist',
+    hospital: 'Apollo Hospitals, New Delhi',
+    license: 'DMC-8948102-DL',
+    abhaId: '91-1892-0194-8201',
+    room: 'Room 304, Ste 4B, Cardiology Tower',
+    hours: '09:00 AM - 04:30 PM IST • Mon-Fri',
+    photo: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80',
+  });
+
+
   // Patient Modals state
   const [showSOS, setShowSOS] = useState(false);
   const [showAITriage, setShowAITriage] = useState(false);
   const [showNearbyClinics, setShowNearbyClinics] = useState(false);
   const [showPatientNotifications, setShowPatientNotifications] = useState(false);
 
-  // Handlers
-  const handleLoginSuccess = (role: 'doctor' | 'patient') => {
+  // Health Pathway & Assessment state
+  const [assessmentData, setAssessmentData] = useState<{
+    assessment: any;
+    pathway: any;
+    hospitals: Hospital[];
+    doctors: Specialist[];
+  } | null>(null);
+  const [initialDeptFilter, setInitialDeptFilter] = useState<string>('');
+
+  const handleCompleteAssessment = (
+    assessment: any,
+    pathway: any,
+    recommendedHospitals: Hospital[],
+    doctors?: Specialist[]
+  ) => {
+    setAssessmentData({
+      assessment,
+      pathway,
+      hospitals: recommendedHospitals,
+      doctors: doctors || [],
+    });
+
+    const dept = pathway?.target_department || assessment?.department || '';
+    setInitialDeptFilter(dept);
+
+    setShowAITriage(false);
+
+    const nextStep = pathway?.next_step || (assessment?.emergency ? 'EMERGENCY' : 'ROUTINE_CONSULTATION');
+
+    if (nextStep === 'EMERGENCY') {
+      if (recommendedHospitals && recommendedHospitals.length > 0) {
+        setHospitals((prev) => {
+          const top = recommendedHospitals[0];
+          const exists = prev.some((h) => h.id === top.id || h.name === top.name);
+          if (!exists) {
+            return [top, ...prev];
+          }
+          return prev;
+        });
+      }
+      setShowSOS(true);
+      setPatientTab('home');
+      showToast('🚨 Automatic Emergency Routing: Critical Emergency SOS Active');
+    } else if (nextStep === 'VIDEO_PREFERRED') {
+      setPatientTab('video_view');
+      showToast('🎥 Automatic Pathway: Video Consultation Recommended');
+    } else if (nextStep === 'VIDEO_OR_IN_PERSON') {
+      setPatientTab('video_choice');
+      showToast('🎥 Automatic Pathway: Choose Video or In-Person Consultation');
+    } else {
+      setPatientTab('book');
+      showToast(`🏥 Automatic Pathway: Doctor List filtered by ${dept || 'Department'}`);
+    }
+  };
+
+  // Handlers for Login & Role Switch
+  const handleLoginSuccess = (role: 'doctor' | 'patient', userName: string) => {
     setCurrentScreen(role);
-    showToast(`Welcome back, ${role === 'doctor' ? 'Dr. Shiv Gupta' : 'Ananya Sharma'}`);
+    showToast(`Authenticated as ${userName}`);
   };
 
   const handleSignOut = () => {
-    setCurrentScreen('login');
+    setCurrentScreen('landing');
     setDoctorTab('home');
     setPatientTab('home');
-    showToast('Signed out securely');
+    showToast('Signed out to Landing Page');
   };
 
   const handleSaveConsultation = (aptId: string) => {
@@ -221,7 +345,19 @@ export default function App() {
 
   const handleConfirmReschedule = (aptId: string, date: string, time: string) => {
     setAppointments((prev) =>
-      prev.map((a) => (a.id === aptId ? { ...a, date, time, dateLabel: date } : a))
+      prev.map((a) => {
+        if (a.id === aptId) {
+          const isToday = date.toLowerCase().includes('today');
+          return {
+            ...a,
+            date,
+            time,
+            dateLabel: date,
+            status: isToday ? 'TODAY' : 'UPCOMING',
+          };
+        }
+        return a;
+      })
     );
     setRescheduleApt(null);
     showToast(`Appointment rescheduled to ${date}, ${time}`);
@@ -274,18 +410,49 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col font-body selection:bg-primary-container selection:text-on-primary-container">
-      {/* 1. Login Screen */}
-      {currentScreen === 'login' && (
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      {/* 1. Landing Page */}
+      {currentScreen === 'landing' && (
+        <LandingPage onNavigateScreen={(screen) => setCurrentScreen(screen)} />
       )}
 
-      {/* 2. Doctor Portal */}
+      {/* 2. Login Page */}
+      {currentScreen === 'login' && (
+        <LoginPage
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateScreen={(screen) => setCurrentScreen(screen)}
+        />
+      )}
+
+      {/* 3. Patient Registration Wizard */}
+      {currentScreen === 'patient_register' && (
+        <PatientRegistrationWizard
+          onCompletePatientRegistration={(userName) => {
+            setCurrentScreen('patient');
+            showToast(`Welcome ${userName}! Health account created.`);
+          }}
+          onNavigateScreen={(screen) => setCurrentScreen(screen)}
+        />
+      )}
+
+      {/* 4. Doctor Registration Wizard */}
+      {currentScreen === 'doctor_register' && (
+        <DoctorRegistrationWizard
+          onCompleteDoctorRegistration={(doctorName) => {
+            setCurrentScreen('doctor');
+            showToast(`Welcome ${doctorName}! Doctor profile registered.`);
+          }}
+          onNavigateScreen={(screen) => setCurrentScreen(screen)}
+        />
+      )}
+
+      {/* 5. Doctor Portal */}
       {currentScreen === 'doctor' && (
         <div className="flex flex-col min-h-screen pt-16">
           <DoctorHeader
             onOpenNotifications={() => setDoctorTab('alerts')}
             onOpenProfile={() => setDoctorTab('profile')}
             unreadNotificationsCount={notifications.filter((n) => n.unread).length}
+            docProfile={docProfile}
           />
 
           <main className="flex-1 w-full animate-in fade-in duration-200">
@@ -302,7 +469,7 @@ export default function App() {
                     initials: p.name.substring(0, 2).toUpperCase(),
                     ageGender: `${p.age}y • ${p.gender}`,
                     mrn: p.mrn,
-                    date: 'Oct 24, 2026',
+                    date: 'Sep 12, 2026',
                     time: '10:00 AM',
                     department: p.dept,
                     reason: p.reason,
@@ -313,6 +480,7 @@ export default function App() {
                 }}
                 onShowToast={showToast}
                 urgentAcknowledged={urgentAcknowledged}
+                onReschedule={(apt) => setRescheduleApt(apt)}
               />
             )}
 
@@ -339,7 +507,7 @@ export default function App() {
                     blood: 'O+',
                     priority: 'NORMAL',
                     status: apt.status === 'COMPLETED' ? 'COMPLETED' : 'WAITING',
-                    lastVisit: 'Oct 10, 2026',
+                    lastVisit: 'Sep 05, 2026',
                     nextAppointment: `${apt.date}, ${apt.time}`,
                     allergies: 'None recorded',
                     meds: 'Standard clinical dosage',
@@ -375,7 +543,12 @@ export default function App() {
             )}
 
             {doctorTab === 'profile' && (
-              <DoctorProfileView onSignOut={handleSignOut} onShowToast={showToast} />
+              <DoctorProfileView
+                onSignOut={handleSignOut}
+                onShowToast={showToast}
+                docProfile={docProfile}
+                onUpdateDocProfile={(prof) => setDocProfile(prof)}
+              />
             )}
           </main>
 
@@ -431,11 +604,12 @@ export default function App() {
               };
               setActiveConsultationApt(apt);
             }}
+            medicalRecords={medicalRecords}
           />
         </div>
       )}
 
-      {/* 3. Patient Portal */}
+      {/* 6. Patient Portal */}
       {currentScreen === 'patient' && (
         <div className="flex flex-col min-h-screen pt-16">
           <PatientHeader
@@ -457,10 +631,43 @@ export default function App() {
 
             {patientTab === 'book' && (
               <BookAppointmentView
-                specialists={specialists}
+                specialists={assessmentData?.doctors && assessmentData.doctors.length > 0 ? assessmentData.doctors : specialists}
                 appointments={appointments}
+                initialDeptFilter={initialDeptFilter}
                 onConfirmBooking={handleConfirmPatientBooking}
                 onCancelAppointment={handleConfirmCancel}
+                onShowToast={showToast}
+              />
+            )}
+
+            {patientTab === 'emergency_view' && (
+              <EmergencyAssistanceView
+                assessment={assessmentData?.assessment}
+                pathway={assessmentData?.pathway}
+                topHospital={assessmentData?.hospitals?.[0]}
+                onTriggerSOS={handleTriggerPatientSOS}
+                onShowToast={showToast}
+                onBackToHome={() => setPatientTab('home')}
+              />
+            )}
+
+            {(patientTab === 'video_view' || patientTab === 'video_choice') && (
+              <VideoConsultationRecommendationView
+                assessment={assessmentData?.assessment}
+                pathway={assessmentData?.pathway}
+                doctors={assessmentData?.doctors && assessmentData.doctors.length > 0 ? assessmentData.doctors : specialists}
+                onSelectDoctor={(doc, mode) => {
+                  handleConfirmPatientBooking(doc, 'Sep 14, 2026', '10:00 AM', mode, assessmentData?.assessment?.reason || 'Consultation');
+                }}
+                onShowToast={showToast}
+                onBackToHome={() => setPatientTab('home')}
+              />
+            )}
+
+            {patientTab === 'records' && (
+              <PatientMedicalRecordsView
+                records={medicalRecords}
+                onUploadRecord={(rec) => setMedicalRecords((prev) => [rec, ...prev])}
                 onShowToast={showToast}
               />
             )}
@@ -486,26 +693,9 @@ export default function App() {
             activeSos={activeSos}
             onTriggerSOS={handleTriggerPatientSOS}
             onResetSOS={handleResetSOS}
+            onCompleteAssessment={handleCompleteAssessment}
           />
         </div>
-      )}
-
-      {/* Floating Demo Quick-Switch Badge */}
-      {currentScreen !== 'login' && (
-        <aside aria-label="Portal Switcher" className="fixed top-18 right-3 z-30 flex items-center gap-1.5 bg-surface-container-highest/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-md border border-outline-variant/30 text-xs">
-          <span className="font-label-caps text-[10px] uppercase font-bold text-on-surface-variant">Switch:</span>
-          <button
-            onClick={() => {
-              const nextRole = currentScreen === 'doctor' ? 'patient' : 'doctor';
-              setCurrentScreen(nextRole);
-              showToast(`Switched to ${nextRole === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}`);
-            }}
-            className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1"
-          >
-            <span>{currentScreen === 'doctor' ? 'Patient Portal' : 'Doctor Portal'}</span>
-            <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
-          </button>
-        </aside>
       )}
 
       {/* Global Toast Banner */}

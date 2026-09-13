@@ -66,6 +66,7 @@ export const PatientNav: React.FC<PatientNavProps> = ({ activeTab, onTabChange }
   const items: { tab: PatientTab; label: string; icon: string }[] = [
     { tab: 'home', label: 'Home', icon: 'home' },
     { tab: 'book', label: 'Book', icon: 'calendar_add_on' },
+    { tab: 'records', label: 'Records', icon: 'folder_shared' },
     { tab: 'profile', label: 'Profile', icon: 'person' },
   ];
 

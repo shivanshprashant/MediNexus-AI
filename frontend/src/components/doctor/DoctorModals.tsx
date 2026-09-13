@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Patient, Appointment, NotificationItem, Hospital, ActiveSosState } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Patient, Appointment, NotificationItem, Hospital, ActiveSosState, MedicalRecord } from '../../types';
 
 interface DoctorModalsProps {
   selectedPatient: Patient | null;
@@ -32,6 +32,7 @@ interface DoctorModalsProps {
   onConfirmCancel: (aptId: string) => void;
   onOpenAISummaryFromPatient: (patient: Patient) => void;
   onStartConsultFromPatient: (patient: Patient) => void;
+  medicalRecords?: MedicalRecord[];
 }
 
 export const DoctorModals: React.FC<DoctorModalsProps> = ({
@@ -61,15 +62,25 @@ export const DoctorModals: React.FC<DoctorModalsProps> = ({
   onConfirmCancel,
   onOpenAISummaryFromPatient,
   onStartConsultFromPatient,
+  medicalRecords = [],
 }) => {
-  const [reschedDate, setReschedDate] = useState('Mon 24');
+  const [reschedDate, setReschedDate] = useState('Tomorrow, Sep 13');
   const [reschedTime, setReschedTime] = useState('09:00 AM');
   const [notes, setNotes] = useState('Pt reports retrosternal tightness on exertion. Resting ECG normal sinus rhythm.');
   const [plan, setPlan] = useState('Titrate beta-blocker. Schedule 24hr Holter monitoring within 48 hours.');
 
+  useEffect(() => {
+    if (rescheduleApt) {
+      setReschedDate(rescheduleApt.dateLabel || rescheduleApt.date || 'Tomorrow, Sep 13');
+      setReschedTime(rescheduleApt.time || '09:00 AM');
+    }
+  }, [rescheduleApt]);
+
   // Redirection state
   const [showRedirectPicker, setShowRedirectPicker] = useState(false);
   const [selectedPartnerHospitalId, setSelectedPartnerHospitalId] = useState(hospitals[1]?.id || 'hosp-2');
+  const [recordSearch, setRecordSearch] = useState('');
+  const [showRecordsSection, setShowRecordsSection] = useState(false);
 
   const partnerHospitals = hospitals.filter((h) => h.id !== 'hosp-1');
 
@@ -117,6 +128,108 @@ export const DoctorModals: React.FC<DoctorModalsProps> = ({
                 <span className="font-bold text-on-surface-variant uppercase block text-[10px]">Medical History</span>
                 <p className="text-on-surface">{selectedPatient.history}</p>
               </div>
+            </div>
+
+            {/* Medical Records Section */}
+            <div className="pt-3">
+              <button
+                onClick={() => { setShowRecordsSection(!showRecordsSection); setRecordSearch(''); }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                  showRecordsSection
+                    ? 'bg-primary/10 border-primary/30 text-primary'
+                    : 'bg-surface-container-low border-outline-variant/30 text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">folder_open</span>
+                  <span className="font-bold text-xs uppercase">Medical Records</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    showRecordsSection ? 'bg-primary/20 text-primary' : 'bg-black/10 text-on-surface-variant'
+                  }`}>
+                    {medicalRecords.filter((r) => r.patientName === selectedPatient.name || r.patientId === selectedPatient.id).length}
+                  </span>
+                </div>
+                <span className={`material-symbols-outlined text-[18px] transition-transform ${showRecordsSection ? 'rotate-180' : ''}`}>expand_more</span>
+              </button>
+
+              {showRecordsSection && (() => {
+                const patientRecs = medicalRecords.filter((r) => r.patientName === selectedPatient.name || r.patientId === selectedPatient.id);
+                const q = recordSearch.toLowerCase();
+                const filteredRecs = q
+                  ? patientRecs.filter(
+                      (r) =>
+                        r.title.toLowerCase().includes(q) ||
+                        r.category.toLowerCase().includes(q) ||
+                        r.doctor.toLowerCase().includes(q) ||
+                        r.department.toLowerCase().includes(q) ||
+                        r.tags.some((t) => t.toLowerCase().includes(q)) ||
+                        r.notes.toLowerCase().includes(q)
+                    )
+                  : patientRecs;
+
+                const catColors: Record<string, string> = {
+                  'Lab Report': 'bg-blue-100 text-blue-700',
+                  'Imaging': 'bg-purple-100 text-purple-700',
+                  'Prescription': 'bg-emerald-100 text-emerald-700',
+                  'Discharge Summary': 'bg-amber-100 text-amber-700',
+                  'Surgical Note': 'bg-red-100 text-red-700',
+                  'Follow-Up Note': 'bg-teal-100 text-teal-700',
+                  'Other': 'bg-gray-100 text-gray-700',
+                };
+                const fileIcons: Record<string, { icon: string; color: string }> = {
+                  pdf: { icon: 'picture_as_pdf', color: 'text-red-500' },
+                  image: { icon: 'image', color: 'text-blue-500' },
+                  dicom: { icon: 'radiology', color: 'text-purple-500' },
+                  doc: { icon: 'description', color: 'text-teal-500' },
+                };
+
+                return (
+                  <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {/* Search */}
+                    <div className="relative mb-2">
+                      <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">search</span>
+                      <input
+                        type="text"
+                        value={recordSearch}
+                        onChange={(e) => setRecordSearch(e.target.value)}
+                        placeholder="Search records, reports, tags..."
+                        className="w-full pl-8 pr-3 py-2 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-[12px] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+
+                    {/* Records List */}
+                    <div className="flex flex-col gap-1.5 max-h-[240px] overflow-y-auto">
+                      {filteredRecs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((rec) => {
+                        const fi = fileIcons[rec.fileType] || fileIcons.doc;
+                        const cc = catColors[rec.category] || catColors.Other;
+                        return (
+                          <div key={rec.id} className="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-container transition-colors">
+                            <div className="w-8 h-8 rounded-md bg-surface-container-high flex items-center justify-center shrink-0">
+                              <span className={`material-symbols-outlined text-[18px] ${fi.color}`}>{fi.icon}</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] text-on-surface font-semibold leading-tight truncate">{rec.title}</div>
+                              <div className="text-[10px] text-on-surface-variant font-data-mono mt-0.5">{rec.date} • {rec.doctor}</div>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap shrink-0 ${cc}`}>
+                              {rec.category}
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                      {filteredRecs.length === 0 && (
+                        <div className="p-4 text-center">
+                          <span className="material-symbols-outlined text-[24px] text-on-surface-variant">search_off</span>
+                          <p className="text-[11px] text-on-surface-variant mt-1">
+                            {q ? `No records matching "${recordSearch}"` : 'No medical records available for this patient.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex gap-2 pt-4">
@@ -382,6 +495,153 @@ export const DoctorModals: React.FC<DoctorModalsProps> = ({
             <button onClick={onCloseEHR} className="w-full py-2.5 bg-primary text-white font-bold text-xs uppercase rounded-xl cursor-pointer">
               Close EHR
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. RESCHEDULE APPOINTMENT MODAL */}
+      {rescheduleApt && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col justify-end sm:justify-center p-0 sm:p-4">
+          <div className="w-full max-w-md mx-auto bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-3 border-b border-surface-container">
+              <div>
+                <span className="font-label-caps text-[10px] uppercase font-bold text-primary">Appointment Management</span>
+                <h3 className="font-headline-md text-base font-bold text-on-surface">Reschedule Appointment</h3>
+              </div>
+              <button onClick={onCloseReschedule} className="p-1 rounded-full text-gray-500 hover:bg-surface-container cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="bg-surface-container-low p-3 rounded-xl space-y-1 text-xs">
+              <div className="font-bold text-on-surface text-sm">{rescheduleApt.name || 'Patient'}</div>
+              <div className="text-on-surface-variant text-[11px] font-mono">{rescheduleApt.mrn || 'MRN-N/A'} • {rescheduleApt.department || 'Cardiology'}</div>
+              <div className="text-primary font-semibold text-[11px] pt-1">
+                Current Time: {rescheduleApt.dateLabel || rescheduleApt.date || 'Today'}, {rescheduleApt.time}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold uppercase text-[10px] text-gray-600 block mb-1">Select New Date</label>
+                <div className="grid grid-cols-3 gap-1.5 mb-2">
+                  {[
+                    'Tomorrow, Sep 13',
+                    'Mon, Sep 14',
+                    'Tue, Sep 15',
+                    'Wed, Sep 16',
+                    'Thu, Sep 17',
+                    'Fri, Sep 18',
+                  ].map((dStr) => (
+                    <button
+                      key={dStr}
+                      type="button"
+                      onClick={() => setReschedDate(dStr)}
+                      className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer truncate ${
+                        reschedDate === dStr
+                          ? 'bg-primary text-white border-primary shadow-sm'
+                          : 'bg-white text-on-surface border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {dStr}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={reschedDate}
+                  onChange={(e) => setReschedDate(e.target.value)}
+                  placeholder="Or enter date (e.g. Thu, Nov 02)"
+                  className="w-full p-2.5 bg-surface-container-low rounded-xl border border-gray-200 text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold uppercase text-[10px] text-gray-600 block mb-1">Select New Time Slot</label>
+                <div className="grid grid-cols-4 gap-1.5 mb-2">
+                  {['09:00 AM', '11:30 AM', '02:00 PM', '04:30 PM'].map((tStr) => (
+                    <button
+                      key={tStr}
+                      type="button"
+                      onClick={() => setReschedTime(tStr)}
+                      className={`py-2 px-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        reschedTime === tStr
+                          ? 'bg-primary text-white border-primary shadow-sm'
+                          : 'bg-white text-on-surface border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tStr}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={reschedTime}
+                  onChange={(e) => setReschedTime(e.target.value)}
+                  placeholder="Or enter time (e.g. 03:15 PM)"
+                  className="w-full p-2.5 bg-surface-container-low rounded-xl border border-gray-200 text-xs font-semibold"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onConfirmReschedule(rescheduleApt.id, reschedDate, reschedTime)}
+                  className="flex-1 py-3 bg-primary hover:bg-primary-container text-white font-bold text-xs uppercase rounded-xl shadow-md cursor-pointer transition-colors"
+                >
+                  Confirm Reschedule
+                </button>
+                <button
+                  type="button"
+                  onClick={onCloseReschedule}
+                  className="py-3 px-4 bg-surface-container text-on-surface font-bold text-xs uppercase rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. CANCEL APPOINTMENT MODAL */}
+      {cancelApt && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-surface-container-lowest rounded-2xl shadow-xl p-5 space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-headline-md text-base font-bold text-on-surface">Cancel Appointment</h3>
+              <button onClick={onCloseCancel} className="cursor-pointer text-gray-500">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-on-surface-variant">
+              Are you sure you want to cancel the scheduled appointment for <strong className="text-on-surface">{cancelApt.name}</strong>?
+            </p>
+
+            <div className="bg-error-container/20 p-3 rounded-xl border border-error/20 text-xs">
+              <div className="font-bold text-error uppercase text-[10px]">Notice</div>
+              <p className="text-on-surface text-[11px] mt-0.5">
+                The patient will be notified via SMS and App Notification of this cancellation.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onConfirmCancel(cancelApt.id)}
+                className="w-full py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-bold text-xs uppercase cursor-pointer shadow-sm"
+              >
+                Confirm Cancellation
+              </button>
+              <button
+                type="button"
+                onClick={onCloseCancel}
+                className="w-full py-2.5 rounded-xl bg-surface-container font-bold text-xs uppercase cursor-pointer"
+              >
+                Keep Appointment
+              </button>
+            </div>
           </div>
         </div>
       )}
