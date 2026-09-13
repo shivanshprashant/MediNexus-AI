@@ -36,7 +36,7 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant font-data-mono text-[12px] shadow-sm font-semibold">
           <span className="material-symbols-outlined text-[16px] text-primary">calendar_clock</span>
-          <span>Oct 24, 2024</span>
+          <span>Sep 12, 2026</span>
         </div>
       </div>
 
@@ -95,7 +95,13 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
                   <div className="font-data-mono text-[11px] text-on-surface-variant mt-0.5">{apt.mrn} • {apt.ageGender}</div>
                 </div>
               </div>
-              <span className="px-2 py-0.5 rounded-full font-label-caps text-[10px] uppercase font-bold bg-primary/10 text-primary">
+              <span className={`px-2 py-0.5 rounded-full font-label-caps text-[10px] uppercase font-bold ${
+                apt.status === 'CANCELLED'
+                  ? 'bg-error/15 text-error'
+                  : apt.status === 'COMPLETED'
+                  ? 'bg-secondary-container text-on-secondary-container'
+                  : 'bg-primary/10 text-primary'
+              }`}>
                 {apt.status}
               </span>
             </div>
@@ -119,32 +125,70 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
               <strong className="text-on-surface font-semibold">Chief Complaint: </strong>{apt.reason}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={() => onStartConsult(apt)}
-                className="py-2.5 px-3 rounded-lg bg-primary text-on-primary font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
-              >
-                <span className="material-symbols-outlined text-[16px]">stethoscope</span>
-                <span>Start Consult</span>
-              </button>
-              <button
-                onClick={() => onOpenDetails(apt)}
-                className="py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
-              >
-                <span className="material-symbols-outlined text-[16px]">visibility</span>
-                <span>View Details</span>
-              </button>
-            </div>
+            {apt.status === 'CANCELLED' ? (
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => onOpenDetails(apt)}
+                  className="flex-1 py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  <span>View Details</span>
+                </button>
+                <button
+                  onClick={() => onReschedule(apt)}
+                  className="flex-1 py-2.5 px-3 rounded-lg bg-primary text-white font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
+                >
+                  <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                  <span>Re-Book / Reschedule</span>
+                </button>
+              </div>
+            ) : apt.status === 'COMPLETED' ? (
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => onOpenDetails(apt)}
+                  className="flex-1 py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  <span>Medical Record</span>
+                </button>
+                <button
+                  onClick={() => onReschedule(apt)}
+                  className="flex-1 py-2.5 px-3 rounded-lg bg-secondary-container text-on-secondary-container font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer font-bold"
+                >
+                  <span className="material-symbols-outlined text-[16px]">event_repeat</span>
+                  <span>Follow-Up Consult</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => onStartConsult(apt)}
+                    className="py-2.5 px-3 rounded-lg bg-primary text-on-primary font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">stethoscope</span>
+                    <span>Start Consult</span>
+                  </button>
+                  <button
+                    onClick={() => onOpenDetails(apt)}
+                    className="py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>View Details</span>
+                  </button>
+                </div>
 
-            <div className="flex items-center justify-end gap-3 pt-0.5 text-[12px]">
-              <button onClick={() => onReschedule(apt)} className="text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
-                <span className="material-symbols-outlined text-[14px]">calendar_month</span> Reschedule
-              </button>
-              <span className="text-gray-300">•</span>
-              <button onClick={() => onCancel(apt)} className="text-error font-semibold flex items-center gap-1 cursor-pointer hover:underline">
-                <span className="material-symbols-outlined text-[14px]">cancel</span> Cancel
-              </button>
-            </div>
+                <div className="flex items-center justify-end gap-3 pt-0.5 text-[12px]">
+                  <button onClick={() => onReschedule(apt)} className="text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                    <span className="material-symbols-outlined text-[14px]">calendar_month</span> Reschedule
+                  </button>
+                  <span className="text-gray-300">•</span>
+                  <button onClick={() => onCancel(apt)} className="text-error font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                    <span className="material-symbols-outlined text-[14px]">cancel</span> Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ))}
 

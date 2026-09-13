@@ -21,9 +21,12 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
 
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
   // Profile State
   const [profile, setProfile] = useState({
     name: 'Ananya Sharma',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     age: '29',
     gender: 'Female',
     city: 'New Delhi',
@@ -38,6 +41,22 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
 
   // Edit Profile Form Buffer State
   const [editForm, setEditForm] = useState({ ...profile });
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const newPhoto = event.target.result as string;
+          setProfile((prev) => ({ ...prev, avatarUrl: newPhoto }));
+          setEditForm((prev) => ({ ...prev, avatarUrl: newPhoto }));
+          onShowToast('Profile picture updated successfully!');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Emergency Contacts State
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
@@ -66,7 +85,7 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
   });
 
   const reports = [
-    { title: 'Comprehensive Lipid Profile & HbA1c', date: 'Oct 18, 2026', doctor: 'Dr. Lal PathLabs', verified: true },
+    { title: 'Comprehensive Lipid Profile & HbA1c', date: 'Sep 05, 2026', doctor: 'Dr. Lal PathLabs', verified: true },
     { title: '12-Lead Electrocardiogram Trace (ECG)', date: 'Aug 10, 2026', doctor: 'Apollo Diagnostics', verified: true },
     { title: 'Complete Blood Count (CBC) & ESR', date: 'Jul 04, 2026', doctor: 'Metropolis Healthcare', verified: true },
     { title: 'Thyroid Profile (T3, T4, TSH)', date: 'May 19, 2026', doctor: 'SRL Diagnostics', verified: true },
@@ -136,10 +155,37 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
       {/* Patient Main Card */}
       <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm flex flex-col gap-3 mb-4">
         <div className="flex items-start gap-4">
-          <img
-            alt={profile.name}
-            className="w-16 h-16 rounded-xl object-cover border border-outline-variant/30 shrink-0"
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+          <div
+            className="relative group cursor-pointer shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            title="Click to change profile picture"
+          >
+            <img
+              alt={profile.name}
+              className="w-16 h-16 rounded-xl object-cover border border-outline-variant/30"
+              src={profile.avatarUrl}
+            />
+            <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="material-symbols-outlined text-white text-[20px]">photo_camera</span>
+            </div>
+            <button
+              type="button"
+              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shadow-md border-2 border-white cursor-pointer hover:bg-primary-container"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              title="Upload New Profile Picture"
+            >
+              <span className="material-symbols-outlined text-[13px]">photo_camera</span>
+            </button>
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handlePhotoChange}
+            accept="image/*"
+            className="hidden"
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between">
@@ -329,6 +375,50 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveProfile} className="py-4 space-y-3 text-xs">
+              {/* Profile Photo Picker Section */}
+              <div className="p-3 bg-surface-container-low rounded-xl border border-gray-200 space-y-2">
+                <label className="font-bold uppercase text-[10px] text-gray-500 block">Profile Picture</label>
+                <div className="flex items-center gap-3">
+                  <img
+                    src={editForm.avatarUrl || profile.avatarUrl}
+                    alt="Profile preview"
+                    className="w-14 h-14 rounded-xl object-cover border border-gray-300 shadow-xs"
+                  />
+                  <div className="flex-1 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-primary text-white font-bold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer hover:bg-primary-container"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">photo_camera</span>
+                      <span>Upload Custom Photo</span>
+                    </button>
+                    <span className="text-[10px] text-gray-500 block font-medium">Supports JPG, PNG, WEBP</span>
+                  </div>
+                </div>
+                <div className="pt-1 border-t border-gray-200/60">
+                  <span className="text-[10px] text-gray-500 font-bold block mb-1">Or select preset avatar:</span>
+                  <div className="flex gap-2">
+                    {[
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+                      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+                      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+                    ].map((url, idx) => (
+                      <img
+                        key={idx}
+                        src={url}
+                        alt={`Preset ${idx + 1}`}
+                        onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: url }))}
+                        className={`w-9 h-9 rounded-lg object-cover cursor-pointer border-2 transition-all ${
+                          editForm.avatarUrl === url ? 'border-primary scale-105 shadow-sm ring-1 ring-primary' : 'border-transparent opacity-70 hover:opacity-100'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Full Legal Name</label>
                 <input

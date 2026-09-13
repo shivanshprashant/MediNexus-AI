@@ -31,7 +31,7 @@ export const PatientDashboardView: React.FC<PatientDashboardViewProps> = ({
           <div>
             <div className="font-label-caps text-[11px] text-primary font-bold uppercase">Patient Portal • ID #PT-4091</div>
             <h1 className="font-headline-md text-2xl font-bold text-on-surface">Good morning, Ananya</h1>
-            <p className="text-xs text-on-surface-variant">Thursday, Oct 24 • Ready for care</p>
+            <p className="text-xs text-on-surface-variant">Saturday, Sep 12 • Ready for care</p>
           </div>
         </div>
       </section>
@@ -136,7 +136,7 @@ export const PatientDashboardView: React.FC<PatientDashboardViewProps> = ({
               <div>
                 <div className="font-headline-md text-sm font-bold text-on-surface">Dr. Shiv Gupta, MD</div>
                 <div className="text-xs text-primary font-medium">Senior Cardiologist • Room 304</div>
-                <div className="text-[11px] text-on-surface-variant mt-0.5">Oct 28 • 10:00 AM EST</div>
+                <div className="text-[11px] text-on-surface-variant mt-0.5">Sep 14 • 10:00 AM EST</div>
               </div>
             </div>
             <span className="px-2 py-0.5 rounded bg-surface-container font-mono text-[10px] text-on-surface">

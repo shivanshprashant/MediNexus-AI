@@ -1,37 +1,32 @@
 import React from 'react';
-import { DoctorTab, DoctorProfileInfo } from '../../types';
+import { HospitalProfile } from '../types';
 
-interface DoctorHeaderProps {
+interface HospitalAdminHeaderProps {
+  profile: HospitalProfile;
+  unreadCount: number;
   onOpenNotifications: () => void;
   onOpenProfile: () => void;
-  unreadNotificationsCount: number;
-  docProfile?: DoctorProfileInfo;
 }
 
-export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
+export const HospitalAdminHeader: React.FC<HospitalAdminHeaderProps> = ({
+  profile,
+  unreadCount,
   onOpenNotifications,
   onOpenProfile,
-  unreadNotificationsCount,
-  docProfile,
 }) => {
-  const doctorName = docProfile?.name || 'Dr. Shiv Gupta';
-  const doctorPhoto =
-    docProfile?.photo ||
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDE5t9YjgeORyB6vFfCDeIIIaRa432s4mT_3YjpsWo-llKbwGnOLc8BKHDHcqmz5GpOlyJOVFrtuKF5I43P6I7eZZ2uW_BDtLh-A8GN8ZiefSEeSBGN-8ZWibU6JNb0cN76L92nwC5-8twN7TBjX-4GNbXUWCA3psZCFkMY8kAtsadai5vRAwpVRf9INwyO7cSeY9EE8BXPQIDdJd4ajy3WT9SpCfJeFylNWXlkFd86jBdEpw12yohFgg';
-
   return (
     <header className="fixed top-0 w-full z-40 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30 pt-safe transition-shadow duration-200">
       <div className="h-16 px-4 flex items-center justify-between gap-2 max-w-lg mx-auto">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={onOpenProfile}>
           <div className="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm">
-            <span className="material-symbols-outlined text-[20px]">vital_signs</span>
+            <span className="material-symbols-outlined text-[20px]">domain</span>
           </div>
           <div className="flex flex-col">
             <span className="font-label-caps uppercase tracking-wider text-primary font-bold text-[11px]">
-              MEDINEXUS AI
+              {profile.hospitalCode} • MEDINEXUS ADMIN
             </span>
-            <span className="font-headline-md text-[15px] leading-tight font-semibold text-on-surface truncate">
-              {doctorName}
+            <span className="font-headline-md text-[15px] leading-tight font-semibold text-on-surface truncate max-w-[200px] sm:max-w-none">
+              {profile.name}
             </span>
           </div>
         </div>
@@ -44,22 +39,20 @@ export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
             onClick={onOpenNotifications}
           >
             <span className="material-symbols-outlined text-[23px]">notifications</span>
-            {unreadNotificationsCount > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-surface"></span>
             )}
           </button>
 
           <button
             type="button"
-            aria-label="Doctor Profile"
+            aria-label="Admin Profile"
             className="relative rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer"
             onClick={onOpenProfile}
           >
-            <img
-              alt={doctorName}
-              className="w-8 h-8 rounded-full object-cover border border-outline-variant/40"
-              src={doctorPhoto}
-            />
+            <div className="w-8 h-8 rounded-full bg-primary text-on-primary font-mono font-bold text-xs flex items-center justify-center border border-outline-variant/40">
+              {profile.adminName ? profile.adminName.substring(0, 2).toUpperCase() : 'HA'}
+            </div>
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-surface"></span>
           </button>
         </div>
@@ -67,4 +60,3 @@ export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
     </header>
   );
 };
-

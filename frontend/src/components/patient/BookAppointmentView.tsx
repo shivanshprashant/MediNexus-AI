@@ -4,6 +4,7 @@ import { Specialist, Appointment } from '../../types';
 interface BookAppointmentViewProps {
   specialists: Specialist[];
   appointments?: Appointment[];
+  initialDeptFilter?: string;
   onConfirmBooking: (specialist: Specialist, date: string, time: string, modality: string, reason: string) => void;
   onCancelAppointment?: (aptId: string) => void;
   onShowToast: (msg: string) => void;
@@ -12,24 +13,34 @@ interface BookAppointmentViewProps {
 export const BookAppointmentView: React.FC<BookAppointmentViewProps> = ({
   specialists,
   appointments = [],
+  initialDeptFilter,
   onConfirmBooking,
   onCancelAppointment,
   onShowToast,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'find' | 'schedule'>('find');
   const [scheduleFilter, setScheduleFilter] = useState<'upcoming' | 'past'>('upcoming');
-  const [deptFilter, setDeptFilter] = useState('All');
+  const [deptFilter, setDeptFilter] = useState(initialDeptFilter || 'All');
   const [bookingSpecialist, setBookingSpecialist] = useState<Specialist | null>(null);
   const [selectedSlot, setSelectedSlot] = useState('10:00 AM');
-  const [selectedDate, setSelectedDate] = useState('Today, Oct 24');
+  const [selectedDate, setSelectedDate] = useState('Today, Sep 12');
   const [modality, setModality] = useState<'In-Person OPD' | 'Secure Teleconsult'>('In-Person OPD');
   const [patientReason, setPatientReason] = useState('Routine cardiac follow-up & medication review.');
 
-  const depts = ['All', 'Cardiology', 'Neurology', 'Orthopedics', 'Endocrinology'];
+  React.useEffect(() => {
+    if (initialDeptFilter) {
+      setDeptFilter(initialDeptFilter);
+    }
+  }, [initialDeptFilter]);
+
+  const depts = ['All', 'Cardiology', 'Neurology', 'Orthopedics', 'Endocrinology', 'Dermatology', 'Primary Care', 'Emergency Medicine'];
 
   const filteredSpecialists = deptFilter === 'All'
     ? specialists
-    : specialists.filter((s) => (s.dept || s.specialty || '').toLowerCase().includes(deptFilter.toLowerCase()));
+    : specialists.filter((s) => {
+        const text = `${s.dept || ''} ${s.specialty || ''}`.toLowerCase();
+        return text.includes(deptFilter.toLowerCase());
+      });
 
   // Patient appointments
   const allPatientAppointments = appointments.filter(
@@ -363,7 +374,7 @@ export const BookAppointmentView: React.FC<BookAppointmentViewProps> = ({
               <div>
                 <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Select Date</label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {['Today, Oct 24', 'Fri, Oct 25', 'Mon, Oct 28'].map((d) => (
+                  {['Today, Sep 12', 'Sun, Sep 13', 'Mon, Sep 14'].map((d) => (
                     <button
                       key={d}
                       type="button"

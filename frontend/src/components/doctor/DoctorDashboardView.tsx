@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Patient, DoctorTab } from '../../types';
+import { Patient, DoctorTab, Appointment } from '../../types';
 
 interface DoctorDashboardViewProps {
   onNavigateTab: (tab: DoctorTab) => void;
@@ -9,6 +9,7 @@ interface DoctorDashboardViewProps {
   onStartConsultation: (patient: Patient) => void;
   onShowToast: (msg: string) => void;
   urgentAcknowledged: boolean;
+  onReschedule?: (apt: Appointment) => void;
 }
 
 export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
@@ -19,9 +20,11 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
   onStartConsultation,
   onShowToast,
   urgentAcknowledged,
+  onReschedule,
 }) => {
   const [isOffline, setIsOffline] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'urgent'>('all');
+
 
   const rahulPatient: Patient = {
     id: 'p2-rahul',
@@ -53,7 +56,7 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
     blood: 'A+',
     priority: 'NORMAL',
     status: 'WAITING',
-    lastVisit: 'Oct 10, 2026',
+    lastVisit: 'Sep 05, 2026',
     nextAppointment: 'Today at 10:30 AM (Station 2)',
     allergies: 'None documented',
     meds: 'Atorvastatin 40mg, Metoprolol 25mg',
@@ -93,7 +96,7 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
     blood: 'AB-',
     priority: 'NORMAL',
     status: 'WAITING',
-    lastVisit: 'Oct 24, 2026',
+    lastVisit: 'Sep 12, 2026',
     nextAppointment: 'Today at 01:30 PM',
     allergies: 'Latex',
     meds: 'Rosuvastatin 20mg',
@@ -212,7 +215,7 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
               Good morning, Dr. Gupta
             </h1>
             <p className="font-body-md text-[13px] text-on-surface-variant">
-              Thursday, Oct 24 • 8 Consultations Today
+              Saturday, Sep 12 • 8 Consultations Today
             </p>
           </div>
         </div>
@@ -531,7 +534,25 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => onShowToast('Reschedule request sent for Dev Patel')}
+                onClick={() => {
+                  if (onReschedule) {
+                    onReschedule({
+                      id: 'apt-dev',
+                      name: 'Dev Patel',
+                      ageGender: '51y • Male',
+                      mrn: 'MN-3199',
+                      date: 'Today',
+                      dateLabel: 'Today',
+                      time: '02:00 PM',
+                      department: 'Cardiology',
+                      modality: 'Room 304 Consult',
+                      status: 'TODAY',
+                      reason: 'Echocardiogram Review • 30 min duration.',
+                    });
+                  } else {
+                    onShowToast('Reschedule request sent for Dev Patel');
+                  }
+                }}
                 className="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
                 title="Reschedule"
               >
@@ -566,7 +587,25 @@ export const DoctorDashboardView: React.FC<DoctorDashboardViewProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => onShowToast('Reschedule request sent for Priya Nambiar')}
+                onClick={() => {
+                  if (onReschedule) {
+                    onReschedule({
+                      id: 'apt-priya',
+                      name: 'Priya Nambiar',
+                      ageGender: '47y • Female',
+                      mrn: 'MN-8842',
+                      date: 'Today',
+                      dateLabel: 'Today',
+                      time: '02:45 PM',
+                      department: 'Cardiology',
+                      modality: 'Room 304 Consult',
+                      status: 'TODAY',
+                      reason: 'Arrhythmia Holter Monitoring Consult.',
+                    });
+                  } else {
+                    onShowToast('Reschedule request sent for Priya Nambiar');
+                  }
+                }}
                 className="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
                 title="Reschedule"
               >
