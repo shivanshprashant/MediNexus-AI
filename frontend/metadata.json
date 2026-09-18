@@ -1,6 +1,0 @@
-{
-  "name": "MediNexus AI",
-  "description": "HIPAA & HL7 FHIR compliant clinical platform connecting healthcare providers and patients with AI-assisted triage, scheduling, and EHR management.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
