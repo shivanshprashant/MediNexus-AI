@@ -1,12 +1,13 @@
 fastapi
 uvicorn
-
 asyncpg
-
-google-generativeai
-
 pydantic
+pydantic-settings
 python-dotenv
 pyJWT
 passlib
 bcrypt
+sse-starlette
+python-multipart
+httpx
+openai
