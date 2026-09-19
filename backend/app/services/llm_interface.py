@@ -18,7 +18,7 @@ logger = logging.getLogger("medinexus.llm_interface")
 import os
 
 # AI Engine base URL
-AI_ENGINE_URL = os.getenv("AI_ENGINE_URL", "http://localhost:8082")
+AI_ENGINE_URL = os.getenv("AI_ENGINE_URL", "http://localhost:8080")
 
 async def analyze_symptom_with_llm(symptom_text: str, patient_medical_context: Dict[str, Any] = None) -> Dict[str, Any]:
     """
@@ -115,19 +115,38 @@ async def analyze_symptom_with_llm(symptom_text: str, patient_medical_context: D
             "immediate_guidance": []
         }
         
-    if any(kw in text_lower for kw in ["chest", "dizz", "unconscious", "breath", "heart", "stroke", "bleed", "faint", "seize", "collapse", "snake", "accident"]):
+    # Differentiate acute life-threatening emergency from exertional/mild symptoms
+    is_mild_or_exertional = any(kw in text_lower for kw in ["mild", "slight", "stairs", "after climbing", "exercise", "exertion", "walking"])
+    
+    if any(kw in text_lower for kw in ["unconscious", "stroke", "severe bleed", "faint", "seize", "collapse", "snake", "poison", "cyanosis"]) or (
+        any(kw in text_lower for kw in ["chest", "heart", "breath"]) and not is_mild_or_exertional and any(sw in text_lower for sw in ["severe", "crushing", "radiat", "sweat", "can't breathe", "cannot breathe"])
+    ):
         return {
             "severity": "EMERGENCY",
             "level": "Emergency",
             "recommendation": "Immediate threat detected. Do not drive yourself — call emergency services.",
             "emergency_triggered": True,
             "required_care": "Emergency Medicine",
-            "ai_summary": "Patient presented with high-risk symptoms. Recommended STAT ER evaluation.",
+            "ai_summary": "Patient presented with high-risk acute symptoms. Recommended STAT ER evaluation.",
             "input_intent": "MEDICAL",
             "next_step": "EMERGENCY",
             "consultation_mode": "NONE",
             "immediate_guidance": ["Call local emergency hotline", "Remain seated or lying down"]
         }
+    elif any(kw in text_lower for kw in ["chest", "heart"]) and is_mild_or_exertional:
+        return {
+            "severity": "HIGH",
+            "level": "Urgent",
+            "recommendation": "Potential exertional angina or respiratory fatigue. Rest immediately. Schedule an urgent cardiology or OPD consultation today if discomfort continues.",
+            "emergency_triggered": False,
+            "required_care": "Cardiology & Vascular Medicine",
+            "ai_summary": "Mild chest tightness on exertion. Urgent clinical assessment advised.",
+            "input_intent": "MEDICAL",
+            "next_step": "URGENT_IN_PERSON",
+            "consultation_mode": "IN_PERSON",
+            "immediate_guidance": ["Sit down and rest in a well-ventilated room", "Avoid further exertion", "Monitor if tightness subsides with rest"]
+        }
+
     elif any(kw in text_lower for kw in ["fever", "pain", "headache", "nausea", "vomit", "sweat", "weak"]):
         return {
             "severity": "MODERATE",
