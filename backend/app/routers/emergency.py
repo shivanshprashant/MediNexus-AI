@@ -551,7 +551,7 @@ async def get_active_emergency(
                 """SELECT e.*, e.patient_name as e_patient_name, p.name as p_name, p.age, p.dob, p.gender, p.blood, p.allergies, p.meds 
                    FROM emergency_requests e 
                    LEFT JOIN patients p ON e.patient_id = p.id 
-                   WHERE e.patient_id = $1 AND e.status NOT IN ('RESOLVED', 'DISCHARGED')
+                   WHERE e.patient_id = $1 AND e.status NOT IN ('RESOLVED', 'DISCHARGED', 'REJECTED')
                    ORDER BY e.created_at DESC LIMIT 1""", patient_id
             )
         elif patient_name:
@@ -559,7 +559,7 @@ async def get_active_emergency(
                 """SELECT e.*, e.patient_name as e_patient_name, p.name as p_name, p.age, p.dob, p.gender, p.blood, p.allergies, p.meds 
                    FROM emergency_requests e 
                    LEFT JOIN patients p ON e.patient_id = p.id 
-                   WHERE (e.patient_name ILIKE $1 OR p.name ILIKE $1) AND e.status NOT IN ('RESOLVED', 'DISCHARGED')
+                   WHERE (e.patient_name ILIKE $1 OR p.name ILIKE $1) AND e.status NOT IN ('RESOLVED', 'DISCHARGED', 'REJECTED')
                    ORDER BY e.created_at DESC LIMIT 1""", f"%{patient_name.strip()}%"
             )
         else:
@@ -567,7 +567,7 @@ async def get_active_emergency(
                 """SELECT e.*, e.patient_name as e_patient_name, p.name as p_name, p.age, p.dob, p.gender, p.blood, p.allergies, p.meds 
                    FROM emergency_requests e 
                    LEFT JOIN patients p ON e.patient_id = p.id 
-                   WHERE e.status NOT IN ('RESOLVED', 'DISCHARGED')
+                   WHERE e.status NOT IN ('RESOLVED', 'DISCHARGED', 'REJECTED')
                    ORDER BY e.created_at DESC LIMIT 1"""
             )
             
