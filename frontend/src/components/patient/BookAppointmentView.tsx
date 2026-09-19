@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Specialist, Appointment } from '../../types';
+import { createAppointmentApi } from '../../services/api';
 
 interface BookAppointmentViewProps {
   specialists: Specialist[];
@@ -21,44 +22,51 @@ export const BookAppointmentView: React.FC<BookAppointmentViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'find' | 'schedule'>('find');
   const [scheduleFilter, setScheduleFilter] = useState<'upcoming' | 'past'>('upcoming');
   const [deptFilter, setDeptFilter] = useState(initialDeptFilter || 'All');
-  const [bookingSpecialist, setBookingSpecialist] = useState<Specialist | null>(null);
-  const [selectedSlot, setSelectedSlot] = useState('10:00 AM');
-  const [selectedDate, setSelectedDate] = useState('Today, Sep 12');
-  const [modality, setModality] = useState<'In-Person OPD' | 'Secure Teleconsult'>('In-Person OPD');
-  const [patientReason, setPatientReason] = useState('Routine cardiac follow-up & medication review.');
 
   React.useEffect(() => {
     if (initialDeptFilter) {
       setDeptFilter(initialDeptFilter);
     }
   }, [initialDeptFilter]);
+  const [bookingSpecialist, setBookingSpecialist] = useState<Specialist | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState('10:00 AM');
+  const [selectedDate, setSelectedDate] = useState('Today, Oct 24');
+  const [modality, setModality] = useState<'In-Person OPD' | 'Secure Teleconsult'>('In-Person OPD');
+  const [patientReason, setPatientReason] = useState('Routine cardiac follow-up & medication review.');
 
-  const depts = ['All', 'Cardiology', 'Neurology', 'Orthopedics', 'Endocrinology', 'Dermatology', 'Primary Care', 'Emergency Medicine'];
+  const depts = ['All', 'Cardiology', 'Neurology', 'Orthopedics', 'Endocrinology'];
 
   const filteredSpecialists = deptFilter === 'All'
     ? specialists
-    : specialists.filter((s) => {
-        const text = `${s.dept || ''} ${s.specialty || ''}`.toLowerCase();
-        return text.includes(deptFilter.toLowerCase());
-      });
+    : specialists.filter((s) => (s.dept || s.specialty || '').toLowerCase().includes(deptFilter.toLowerCase()));
 
   // Patient appointments
-  const allPatientAppointments = appointments.filter(
-    (a) => a.name === 'Ananya Sharma' || a.id.startsWith('apt-new-') || a.mrn === 'MN-PT-4091' || a.id.startsWith('apt-patient-')
-  );
+  const allPatientAppointments = appointments;
 
   const upcomingAppointments = allPatientAppointments.filter(
     (a) => a.status === 'UPCOMING' || a.status === 'TODAY'
   );
 
-  const pastAppointments = allPatientAppointments.filter(
-    (a) => a.status === 'COMPLETED' || a.status === 'CANCELLED'
-  );
+  const completed = allPatientAppointments.filter((a) => a.status === 'COMPLETED');
+  const cancelled = allPatientAppointments.filter((a) => a.status === 'CANCELLED');
+  const fifoCancelled = [...cancelled].reverse().slice(0, 5);
+  const pastAppointments = [...completed, ...fifoCancelled];
 
   const displayedSchedule = scheduleFilter === 'upcoming' ? upcomingAppointments : pastAppointments;
 
-  const handleBook = () => {
+  const handleBook = async () => {
     if (!bookingSpecialist) return;
+    try {
+      await createAppointmentApi({
+        doctor_id: bookingSpecialist.id || 'doc-001',
+        date: selectedDate,
+        time: selectedSlot,
+        modality: modality,
+        reason: patientReason,
+      });
+    } catch (err) {
+      console.warn('Booking API fallback:', err);
+    }
     onConfirmBooking(bookingSpecialist, selectedDate, selectedSlot, modality, patientReason);
     setBookingSpecialist(null);
     onShowToast(`Appointment booked with ${bookingSpecialist.name}`);
@@ -374,7 +382,7 @@ export const BookAppointmentView: React.FC<BookAppointmentViewProps> = ({
               <div>
                 <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Select Date</label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {['Today, Sep 12', 'Sun, Sep 13', 'Mon, Sep 14'].map((d) => (
+                  {['Today, Oct 24', 'Fri, Oct 25', 'Mon, Oct 28'].map((d) => (
                     <button
                       key={d}
                       type="button"

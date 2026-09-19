@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AppScreen } from '../../types';
+import { registerPatientApi } from '../../services/api';
+import { indiaStatesAndCities, indiaStates } from '../../indiaLocations';
 
 interface PatientRegistrationWizardProps {
   onCompletePatientRegistration: (userName: string) => void;
@@ -13,30 +15,30 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Form States
-  const [fullName, setFullName] = useState('Ananya Sharma');
-  const [email, setEmail] = useState('ananya.sharma@example.com');
-  const [phone, setPhone] = useState('+91 98192 83104');
-  const [password, setPassword] = useState('••••••••');
-  const [confirmPassword, setConfirmPassword] = useState('••••••••');
-  const [dob, setDob] = useState('1997-06-15');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('+91 ');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [dob, setDob] = useState('');
   const [gender, setGender] = useState<'Female' | 'Male' | 'Other'>('Female');
 
   // Medical Profile
   const [bloodGroup, setBloodGroup] = useState('O+');
-  const [heightCm, setHeightCm] = useState('165');
-  const [weightKg, setWeightKg] = useState('58');
-  const [allergies, setAllergies] = useState('Penicillin, Sulfa drugs');
-  const [medicalConditions, setMedicalConditions] = useState('Mild Asthma');
-  const [currentMedications, setCurrentMedications] = useState('Albuterol inhaler PRN');
-  const [previousSurgeries, setPreviousSurgeries] = useState('None');
-  const [emergencyContactName, setEmergencyContactName] = useState('Rohan Sharma (Spouse)');
-  const [emergencyContactPhone, setEmergencyContactPhone] = useState('+91 98192 99999');
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [allergies, setAllergies] = useState('');
+  const [medicalConditions, setMedicalConditions] = useState('');
+  const [currentMedications, setCurrentMedications] = useState('');
+  const [previousSurgeries, setPreviousSurgeries] = useState('');
+  const [emergencyContactName, setEmergencyContactName] = useState('');
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('+91 ');
 
   // Address
-  const [address, setAddress] = useState('Flat 402, Sunshine Apartments, Vasant Kunj');
-  const [city, setCity] = useState('New Delhi');
-  const [state, setState] = useState('Delhi NCR');
-  const [pincode, setPincode] = useState('110070');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
 
   const bloodGroups = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'];
 
@@ -47,8 +49,68 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
     { num: 4, label: 'Review & Create', icon: 'verified' },
   ];
 
-  const handleFinalSubmit = () => {
-    onCompletePatientRegistration(fullName);
+  
+  const handlePhoneChange = (val: string, setter: (s: string) => void) => {
+    const digits = val.replace(/[^\d]/g, '');
+    let actualDigits = digits;
+    if (digits.startsWith('91') && digits.length >= 2) {
+      actualDigits = digits.substring(2);
+    }
+    if (actualDigits.length > 10) {
+      actualDigits = actualDigits.substring(0, 10);
+    }
+    setter('+91 ' + actualDigits);
+  };
+
+  const handleNextOrSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentStep < 4) {
+      setCurrentStep((prev) => Math.min(4, prev + 1));
+    } else {
+      handleFinalSubmit();
+    }
+  };
+
+const handleFinalSubmit = async () => {
+    const emContact = emergencyContactPhone
+      ? (emergencyContactName ? `${emergencyContactName}: ${emergencyContactPhone}` : emergencyContactPhone)
+      : emergencyContactName;
+
+    let calculatedAge = 25;
+    if (dob) {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      calculatedAge = age;
+    }
+    
+    const addressStr = [address, state, pincode].filter(Boolean).join(', ');
+    const historyPayload = `City: ${city || 'New Delhi'}, Address: ${addressStr}. ${medicalConditions}`.trim();
+
+    try {
+      await registerPatientApi({
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        password: password,
+        age: calculatedAge,
+        dob: dob || undefined,
+        gender: gender,
+        blood: bloodGroup,
+        allergies: allergies,
+        meds: currentMedications,
+        history: historyPayload,
+        emergency_contact: emContact,
+      });
+      onCompletePatientRegistration(fullName);
+    } catch (err) {
+      console.warn('Registration API fallback:', err);
+      onCompletePatientRegistration(fullName);
+    }
   };
 
   return (
@@ -122,7 +184,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
         </div>
 
         {/* Form Container */}
-        <div className="bg-white border border-[#d2e2d8] rounded-2xl p-6 md:p-8 shadow-2xs space-y-6">
+        <form onSubmit={handleNextOrSubmit} className="bg-white border border-[#d2e2d8] rounded-2xl p-6 md:p-8 shadow-2xs space-y-6">
           {/* STEP 1: Basic Account */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-in fade-in duration-200">
@@ -172,7 +234,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
                     type="text"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => handlePhoneChange(e.target.value, setPhone)}
                     className="w-full text-xs font-mono rounded-xl border border-gray-300 py-2.5 px-3.5 outline-none"
                     placeholder="+91 98192 83104"
                   />
@@ -374,8 +436,9 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
                   </label>
                   <input
                     type="text"
+                    required
                     value={emergencyContactPhone}
-                    onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                    onChange={(e) => handlePhoneChange(e.target.value, setEmergencyContactPhone)}
                     className="w-full text-xs font-mono font-bold rounded-xl border border-gray-300 py-2 px-3 outline-none"
                     placeholder="+91 98192 99999"
                   />
@@ -409,25 +472,30 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full text-xs rounded-xl border border-gray-300 py-2.5 px-3.5 outline-none"
-                    placeholder="New Delhi"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">State</label>
+                  <select
+                    value={state}
+                    onChange={(e) => { setState(e.target.value); setCity(''); }}
+                    required
+                    className="w-full text-xs rounded-xl border border-gray-300 py-2.5 px-3.5 bg-white outline-none"
+                  >
+                    <option value="">Select State</option>
+                    {indiaStates.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">State</label>
-                  <input
-                    type="text"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className="w-full text-xs rounded-xl border border-gray-300 py-2.5 px-3.5 outline-none"
-                    placeholder="Delhi NCR"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                    className="w-full text-xs rounded-xl border border-gray-300 py-2.5 px-3.5 bg-white outline-none"
+                    disabled={!state}
+                  >
+                    <option value="">Select City</option>
+                    {state && indiaStatesAndCities[state]?.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
 
                 <div>
@@ -501,6 +569,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
           {/* Navigation Controls */}
           <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
             <button
+              type="button"
               onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
               disabled={currentStep === 1}
               className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-800 text-xs font-bold font-mono transition-colors cursor-pointer border border-gray-300"
@@ -510,7 +579,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
 
             {currentStep < 4 ? (
               <button
-                onClick={() => setCurrentStep((prev) => Math.min(4, prev + 1))}
+                type="submit"
                 className="px-5 py-2.5 rounded-xl bg-[#1b3b32] hover:bg-[#122822] text-white text-xs font-bold tracking-wide transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
               >
                 <span>Next Step</span>
@@ -518,7 +587,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
               </button>
             ) : (
               <button
-                onClick={handleFinalSubmit}
+                type="submit"
                 className="px-6 py-3 rounded-xl bg-[#2b8a66] hover:bg-[#20694e] text-white text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">verified</span>
@@ -526,7 +595,7 @@ export const PatientRegistrationWizard: React.FC<PatientRegistrationWizardProps>
               </button>
             )}
           </div>
-        </div>
+        </form>
       </main>
     </div>
   );

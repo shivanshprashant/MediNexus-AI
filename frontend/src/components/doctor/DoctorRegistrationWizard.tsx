@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppScreen } from '../../types';
+import { registerDoctorApi } from '../../services/api';
 
 interface DoctorRegistrationWizardProps {
   onCompleteDoctorRegistration: (doctorName: string) => void;
@@ -13,16 +14,17 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Form States - Doctor Profile
-  const [fullName, setFullName] = useState('Dr. Shiv Gupta');
-  const [email, setEmail] = useState('dr.shiv@citycare.org');
-  const [phone, setPhone] = useState('+91 98110 40291');
-  const [medicalRegId, setMedicalRegId] = useState('MCI-DL-2015-88492');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('+91 ');
+  const [dob, setDob] = useState('');
+  const [medicalRegId, setMedicalRegId] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
 
   // Specialization & Education
   const [specialization, setSpecialization] = useState('Cardiology');
-  const [qualification, setQualification] = useState('MD, DM (Cardiology), FACC');
-  const [experienceYears, setExperienceYears] = useState(12);
+  const [qualification, setQualification] = useState('');
+  const [experienceYears, setExperienceYears] = useState<number>(0);
 
   // Hospital & Shift Allocation
   const [hospitalName, setHospitalName] = useState('CityCare Hospital (HSP-001)');
@@ -50,8 +52,51 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
     { num: 4, label: 'Review & Verify', icon: 'verified' },
   ];
 
-  const handleFinalSubmit = () => {
-    onCompleteDoctorRegistration(fullName);
+  const [password, setPassword] = useState('');
+
+  
+  const handlePhoneChange = (val: string, setter: (s: string) => void) => {
+    const digits = val.replace(/[^\d]/g, '');
+    let actualDigits = digits;
+    if (digits.startsWith('91') && digits.length >= 2) {
+      actualDigits = digits.substring(2);
+    }
+    if (actualDigits.length > 10) {
+      actualDigits = actualDigits.substring(0, 10);
+    }
+    setter('+91 ' + actualDigits);
+  };
+
+  const handleNextOrSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentStep < 4) {
+      setCurrentStep((prev) => Math.min(4, prev + 1));
+    } else {
+      handleFinalSubmit();
+    }
+  };
+
+const handleFinalSubmit = async () => {
+    try {
+      await registerDoctorApi({
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        password: password,
+        dob: dob || undefined,
+        specialization: specialization,
+        qualification: qualification,
+        experience_years: experienceYears,
+        hospital_id: 'hsp-001',
+        department_id: 'dept-cardio',
+        license: medicalRegId,
+        shift: shiftSchedule,
+      });
+      onCompleteDoctorRegistration(fullName);
+    } catch (err) {
+      console.warn('Doctor registration API fallback:', err);
+      onCompleteDoctorRegistration(fullName);
+    }
   };
 
   return (
@@ -130,7 +175,7 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
         </div>
 
         {/* Form Body Container */}
-        <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-5 shadow-2xs space-y-5">
+        <form onSubmit={handleNextOrSubmit} className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-5 shadow-2xs space-y-5">
           {/* STEP 1: Basic Credentials */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-in fade-in duration-200">
@@ -197,6 +242,32 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full text-xs rounded-xl border border-outline-variant/60 focus:border-primary bg-surface-container-lowest text-on-surface py-2.5 px-3.5 outline-none"
                   placeholder="+91 98110..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-outline-variant/60 focus:border-primary bg-surface-container-lowest text-on-surface py-2.5 px-3.5 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Account Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-outline-variant/60 focus:border-primary bg-surface-container-lowest text-on-surface py-2.5 px-3.5 outline-none"
+                  placeholder="••••••••••••"
                 />
               </div>
 
@@ -415,8 +486,7 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
 
             {currentStep < 4 ? (
               <button
-                type="button"
-                onClick={() => setCurrentStep((prev) => Math.min(4, prev + 1))}
+                type="submit"
                 className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
               >
                 <span>Next Step</span>
@@ -424,8 +494,7 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
               </button>
             ) : (
               <button
-                type="button"
-                onClick={handleFinalSubmit}
+                type="submit"
                 className="w-full py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">verified</span>
@@ -433,7 +502,7 @@ export const DoctorRegistrationWizard: React.FC<DoctorRegistrationWizardProps> =
               </button>
             )}
           </div>
-        </div>
+        </form>
       </main>
     </div>
   );

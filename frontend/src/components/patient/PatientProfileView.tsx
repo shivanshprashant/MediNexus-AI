@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { updatePatientProfileApi, fetchPatientProfileApi, uploadPatientPhotoApi, uploadPatientReportApi, fetchPatientReportsApi, deletePatientReportApi, API_BASE_URL } from '../../services/api';
 
 interface EmergencyContact {
   id: string;
@@ -11,23 +12,29 @@ interface EmergencyContact {
 interface PatientProfileViewProps {
   onSignOut: () => void;
   onShowToast: (msg: string) => void;
+  patientProfile?: any;
+  onProfileUpdated?: (updated: any) => void;
 }
 
 export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
   onSignOut,
   onShowToast,
+  patientProfile,
+  onProfileUpdated,
 }) => {
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
 
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
   // Profile State
   const [profile, setProfile] = useState({
     name: 'Ananya Sharma',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     age: '29',
+    dob: '',
     gender: 'Female',
     city: 'New Delhi',
     bloodGroup: 'O+',
@@ -37,26 +44,75 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
     insuranceProvider: 'Star Health & Allied Insurance (Optima Secure)',
     policyNo: 'P/191201/01/2026/00912',
     network: 'Cashless (Apollo/Max/Fortis)',
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   });
 
   // Edit Profile Form Buffer State
   const [editForm, setEditForm] = useState({ ...profile });
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const newPhoto = event.target.result as string;
-          setProfile((prev) => ({ ...prev, avatarUrl: newPhoto }));
-          setEditForm((prev) => ({ ...prev, avatarUrl: newPhoto }));
-          onShowToast('Profile picture updated successfully!');
+  const parseCityFromHistory = (hist: string) => {
+    if (!hist) return '';
+    const match = hist.match(/City:\s*([^,]+)/i);
+    return match ? match[1].trim() : '';
+  };
+
+  const applyProfileData = (data: any) => {
+    if (!data) return;
+    const extractedCity = parseCityFromHistory(data.history);
+    const newProf = {
+      name: data.name || 'Ananya Sharma',
+      age: data.age ? String(data.age) : '29',
+      dob: data.dob || '',
+      gender: data.gender || 'Female',
+      city: extractedCity || 'New Delhi',
+      bloodGroup: data.blood || 'O+',
+      phone: data.phone || '+91 98192 83104',
+      allergies: data.allergies || 'None recorded',
+      abhaId: data.mrn ? `${data.mrn}@abha` : '91-4820-5912-4091@abha',
+      insuranceProvider: 'Star Health & Allied Insurance (Optima Secure)',
+      policyNo: 'P/191201/01/2026/00912',
+      network: 'Cashless (Apollo/Max/Fortis)',
+      photo: data.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    };
+    setProfile(newProf);
+    setEditForm(newProf);
+    if (data.emergency_contact) {
+      try {
+        const parsed = JSON.parse(data.emergency_contact);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmergencyContacts(parsed);
+        } else if (typeof data.emergency_contact === 'string' && data.emergency_contact.trim()) {
+          setEmergencyContacts([{
+            id: 'ec-1',
+            name: data.emergency_contact.split(/[:(]/)[0].trim(),
+            relationship: 'Primary Contact',
+            phone: data.emergency_contact.includes(':') ? data.emergency_contact.split(':')[1].trim() : data.emergency_contact,
+            isPrimary: true,
+          }]);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (e) {
+        if (typeof data.emergency_contact === 'string' && data.emergency_contact.trim()) {
+          setEmergencyContacts([{
+            id: 'ec-1',
+            name: data.emergency_contact.split(/[:(]/)[0].trim(),
+            relationship: 'Primary Contact',
+            phone: data.emergency_contact.includes(':') ? data.emergency_contact.split(':')[1].trim() : data.emergency_contact,
+            isPrimary: true,
+          }]);
+        }
+      }
     }
   };
+
+  useEffect(() => {
+    if (patientProfile) {
+      applyProfileData(patientProfile);
+    } else {
+      fetchPatientProfileApi().then((data) => {
+        if (data) applyProfileData(data);
+      });
+    }
+  }, [patientProfile]);
 
   // Emergency Contacts State
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
@@ -77,6 +133,7 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
   ]);
 
   // New Emergency Contact Form State
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [newContact, setNewContact] = useState({
     name: '',
     relationship: 'Father',
@@ -84,50 +141,180 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
     isPrimary: false,
   });
 
-  const reports = [
-    { title: 'Comprehensive Lipid Profile & HbA1c', date: 'Sep 05, 2026', doctor: 'Dr. Lal PathLabs', verified: true },
-    { title: '12-Lead Electrocardiogram Trace (ECG)', date: 'Aug 10, 2026', doctor: 'Apollo Diagnostics', verified: true },
-    { title: 'Complete Blood Count (CBC) & ESR', date: 'Jul 04, 2026', doctor: 'Metropolis Healthcare', verified: true },
-    { title: 'Thyroid Profile (T3, T4, TSH)', date: 'May 19, 2026', doctor: 'SRL Diagnostics', verified: true },
-  ];
+  const syncEmergencyContactsApi = async (updatedList: EmergencyContact[]) => {
+    try {
+      const updated = await updatePatientProfileApi({
+        emergency_contact: JSON.stringify(updatedList)
+      });
+      if (updated && onProfileUpdated) {
+        onProfileUpdated(updated);
+      }
+    } catch (err) {
+      console.warn('Failed to sync emergency contact to backend:', err);
+    }
+  };
+
+  const [reports, setReports] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const loadReports = async () => {
+    try {
+      const data = await fetchPatientReportsApi();
+      setReports(data || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      await uploadPatientReportApi(file);
+      onShowToast('Report uploaded successfully');
+      loadReports();
+    } catch (err: any) {
+      onShowToast(err.message || 'Failed to upload report');
+    } finally {
+      setIsUploading(false);
+      e.target.value = ''; // Reset input
+    }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!window.confirm('Are you sure you want to delete this report?')) return;
+    try {
+      await deletePatientReportApi(reportId);
+      onShowToast('Report deleted');
+      loadReports();
+    } catch (err: any) {
+      onShowToast(err.message || 'Failed to delete report');
+    }
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      onShowToast('Invalid image type. Allowed: JPEG, PNG, WEBP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      onShowToast('File size exceeds 5MB limit.');
+      return;
+    }
+    setSelectedPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
 
   // Save Profile Handler
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile({ ...editForm });
+    let updatedPhoto = editForm.photo;
+    if (selectedPhotoFile) {
+      try {
+        const photoRes = await uploadPatientPhotoApi(selectedPhotoFile);
+        if (photoRes && photoRes.photo) {
+          updatedPhoto = photoRes.photo;
+        }
+      } catch (err: any) {
+        onShowToast(err.message || 'Photo upload failed.');
+      }
+    }
+
+    const currentForm = { ...editForm, photo: updatedPhoto };
+    setProfile(currentForm);
     setShowEditProfileModal(false);
+    try {
+      const updated = await updatePatientProfileApi({
+        name: currentForm.name,
+        age: parseInt(currentForm.age) || undefined,
+        dob: currentForm.dob || undefined,
+        gender: currentForm.gender,
+        blood: currentForm.bloodGroup,
+        phone: currentForm.phone,
+        allergies: currentForm.allergies,
+        meds: profile.allergies,
+        history: `Age: ${currentForm.age}, Gender: ${currentForm.gender}, City: ${currentForm.city}`,
+        photo: updatedPhoto,
+      });
+      if (updated) {
+        applyProfileData(updated);
+        if (onProfileUpdated) onProfileUpdated(updated);
+      }
+    } catch (err) {
+      console.warn('Update patient profile API fallback:', err);
+    }
+    setSelectedPhotoFile(null);
+    setPhotoPreviewUrl(null);
     onShowToast('Profile details updated successfully!');
   };
 
-  // Add Emergency Contact Handler
+  // Add/Edit Emergency Contact Handler
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContact.name.trim()) return;
 
-    const contact: EmergencyContact = {
-      id: `ec-${Date.now()}`,
-      name: newContact.name.trim(),
-      relationship: newContact.relationship,
-      phone: newContact.phone.trim(),
-      isPrimary: newContact.isPrimary,
-    };
-
-    if (newContact.isPrimary) {
-      setEmergencyContacts((prev) =>
-        prev.map((c) => ({ ...c, isPrimary: false })).concat(contact)
-      );
+    let updatedList: EmergencyContact[];
+    if (editingContactId) {
+      updatedList = emergencyContacts.map((c) => {
+        if (c.id === editingContactId) {
+          return {
+            ...c,
+            name: newContact.name.trim(),
+            relationship: newContact.relationship,
+            phone: newContact.phone.trim(),
+            isPrimary: newContact.isPrimary,
+          };
+        }
+        return newContact.isPrimary ? { ...c, isPrimary: false } : c;
+      });
     } else {
-      setEmergencyContacts((prev) => [...prev, contact]);
+      const contact: EmergencyContact = {
+        id: `ec-${Date.now()}`,
+        name: newContact.name.trim(),
+        relationship: newContact.relationship,
+        phone: newContact.phone.trim(),
+        isPrimary: newContact.isPrimary,
+      };
+      if (newContact.isPrimary) {
+        updatedList = emergencyContacts.map((c) => ({ ...c, isPrimary: false })).concat(contact);
+      } else {
+        updatedList = [...emergencyContacts, contact];
+      }
     }
 
+    setEmergencyContacts(updatedList);
+    syncEmergencyContactsApi(updatedList);
+
     setNewContact({ name: '', relationship: 'Father', phone: '+91 ', isPrimary: false });
+    setEditingContactId(null);
     setShowAddContactModal(false);
-    onShowToast(`Emergency contact "${contact.name}" added successfully`);
+    onShowToast(`Emergency contact "${newContact.name}" saved successfully`);
+  };
+
+  const handleStartEditContact = (contact: EmergencyContact) => {
+    setEditingContactId(contact.id);
+    setNewContact({
+      name: contact.name,
+      relationship: contact.relationship,
+      phone: contact.phone,
+      isPrimary: contact.isPrimary,
+    });
+    setShowAddContactModal(true);
   };
 
   // Delete Emergency Contact Handler
   const handleDeleteContact = (id: string, name: string) => {
-    setEmergencyContacts((prev) => prev.filter((c) => c.id !== id));
+    const updatedList = emergencyContacts.filter((c) => c.id !== id);
+    setEmergencyContacts(updatedList);
+    syncEmergencyContactsApi(updatedList);
     onShowToast(`Removed ${name} from emergency contacts`);
   };
 
@@ -155,37 +342,10 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
       {/* Patient Main Card */}
       <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm flex flex-col gap-3 mb-4">
         <div className="flex items-start gap-4">
-          <div
-            className="relative group cursor-pointer shrink-0"
-            onClick={() => fileInputRef.current?.click()}
-            title="Click to change profile picture"
-          >
-            <img
-              alt={profile.name}
-              className="w-16 h-16 rounded-xl object-cover border border-outline-variant/30"
-              src={profile.avatarUrl}
-            />
-            <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="material-symbols-outlined text-white text-[20px]">photo_camera</span>
-            </div>
-            <button
-              type="button"
-              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shadow-md border-2 border-white cursor-pointer hover:bg-primary-container"
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              title="Upload New Profile Picture"
-            >
-              <span className="material-symbols-outlined text-[13px]">photo_camera</span>
-            </button>
-          </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handlePhotoChange}
-            accept="image/*"
-            className="hidden"
+          <img
+            alt={profile.name}
+            className="w-16 h-16 rounded-xl object-cover border border-outline-variant/30 shrink-0"
+            src={profile.photo}
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between">
@@ -268,7 +428,21 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => onShowToast(`Calling ${contact.name} (${contact.phone})...`)}
+                  onClick={() => handleStartEditContact(contact)}
+                  className="p-1.5 text-primary hover:bg-primary/10 rounded-full cursor-pointer"
+                  title="Edit Contact"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanNumber = contact.phone.replace(/[^\d+]/g, '');
+                    onShowToast(`Calling ${contact.name} (${contact.phone})...`);
+                    if (cleanNumber) {
+                      window.location.href = `tel:${cleanNumber}`;
+                    }
+                  }}
                   className="p-1.5 text-primary hover:bg-primary/10 rounded-full cursor-pointer"
                   title="Call Contact"
                 >
@@ -315,32 +489,58 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
             <span className="material-symbols-outlined text-primary text-[18px]">folder_open</span>
             Diagnostic Reports & Lab Vault
           </h3>
-          <button
-            type="button"
-            onClick={() => onShowToast('Upload PDF/Scan to ABHA Vault simulated')}
-            className="px-2 py-1 bg-surface-container hover:bg-surface-container-high rounded text-[11px] font-bold text-primary cursor-pointer flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[14px]">upload</span> Upload Report
-          </button>
+          <label className="px-2 py-1 bg-surface-container hover:bg-surface-container-high rounded text-[11px] font-bold text-primary cursor-pointer flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">{isUploading ? 'hourglass_empty' : 'upload'}</span> 
+            {isUploading ? 'Uploading...' : 'Upload Report'}
+            <input 
+              type="file" 
+              className="hidden" 
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+            />
+          </label>
         </div>
 
         <div className="flex flex-col gap-2">
-          {reports.map((r, i) => (
-            <div key={i} className="p-2.5 bg-surface-container-low rounded-lg flex items-center justify-between text-xs">
+          {reports.length === 0 && (
+            <div className="text-center p-4 text-xs text-on-surface-variant">
+              No reports uploaded yet.
+            </div>
+          )}
+          {reports.map((r) => (
+            <div key={r.id} className="p-2.5 bg-surface-container-low rounded-lg flex items-center justify-between text-xs">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-primary text-[20px]">picture_as_pdf</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">
+                  {r.fileType?.includes('pdf') ? 'picture_as_pdf' : 'image'}
+                </span>
                 <div>
-                  <strong className="text-on-surface block truncate max-w-[200px]">{r.title}</strong>
-                  <span className="text-[10px] text-on-surface-variant">{r.date} • {r.doctor}</span>
+                  <strong className="text-on-surface block truncate max-w-[200px]" title={r.fileName}>{r.fileName}</strong>
+                  <span className="text-[10px] text-on-surface-variant">
+                    {r.uploadedAt ? new Date(r.uploadedAt).toLocaleDateString() : 'Unknown date'} • 
+                    {(r.fileSize / 1024 / 1024).toFixed(2)} MB
+                  </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => onShowToast(`Downloading ${r.title}`)}
-                className="p-1.5 text-primary hover:bg-surface-container rounded-full cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">download</span>
-              </button>
+              <div className="flex items-center gap-1">
+                <a
+                  href={`${API_BASE_URL.replace('/api', '')}${r.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-primary hover:bg-surface-container rounded-full cursor-pointer"
+                  title="View/Download"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteReport(r.id)}
+                  className="p-1.5 text-error hover:bg-error-container rounded-full cursor-pointer"
+                  title="Delete"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -375,50 +575,31 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveProfile} className="py-4 space-y-3 text-xs">
-              {/* Profile Photo Picker Section */}
-              <div className="p-3 bg-surface-container-low rounded-xl border border-gray-200 space-y-2">
-                <label className="font-bold uppercase text-[10px] text-gray-500 block">Profile Picture</label>
-                <div className="flex items-center gap-3">
-                  <img
-                    src={editForm.avatarUrl || profile.avatarUrl}
-                    alt="Profile preview"
-                    className="w-14 h-14 rounded-xl object-cover border border-gray-300 shadow-xs"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 bg-primary text-white font-bold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer hover:bg-primary-container"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-                      <span>Upload Custom Photo</span>
-                    </button>
-                    <span className="text-[10px] text-gray-500 block font-medium">Supports JPG, PNG, WEBP</span>
-                  </div>
+              <div className="flex items-center gap-3 p-2 bg-surface-container-low rounded-xl border border-gray-200">
+                <img
+                  src={photoPreviewUrl || editForm.photo || profile.photo}
+                  alt={profile.name}
+                  className="w-12 h-12 rounded-xl object-cover border border-outline-variant/30 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold text-xs text-on-surface block truncate">Profile Photo</span>
+                  <span className="text-[10px] text-gray-500 block">JPEG, PNG, WEBP (Max 5MB)</span>
                 </div>
-                <div className="pt-1 border-t border-gray-200/60">
-                  <span className="text-[10px] text-gray-500 font-bold block mb-1">Or select preset avatar:</span>
-                  <div className="flex gap-2">
-                    {[
-                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-                      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-                      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-                    ].map((url, idx) => (
-                      <img
-                        key={idx}
-                        src={url}
-                        alt={`Preset ${idx + 1}`}
-                        onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: url }))}
-                        className={`w-9 h-9 rounded-lg object-cover cursor-pointer border-2 transition-all ${
-                          editForm.avatarUrl === url ? 'border-primary scale-105 shadow-sm ring-1 ring-primary' : 'border-transparent opacity-70 hover:opacity-100'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 bg-primary text-white font-bold text-xs rounded-xl cursor-pointer hover:bg-primary-container shrink-0"
+                >
+                  Change Photo
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
               </div>
-
               <div>
                 <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Full Legal Name</label>
                 <input
@@ -432,12 +613,12 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Age</label>
+                  <label className="font-bold uppercase text-[10px] text-gray-500 block mb-1">Date of Birth</label>
                   <input
-                    type="number"
+                    type="date"
                     required
-                    value={editForm.age}
-                    onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                    value={editForm.dob || ''}
+                    onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
                     className="w-full p-2.5 bg-surface-container-low rounded-xl border border-gray-200 outline-none text-xs text-center text-on-surface"
                   />
                 </div>
@@ -536,11 +717,16 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-surface-container">
               <div>
                 <span className="font-label-caps text-[10px] uppercase font-bold text-error">Emergency Response</span>
-                <h3 className="font-headline-md text-base font-bold text-on-surface">Add Emergency Contact</h3>
+                <h3 className="font-headline-md text-base font-bold text-on-surface">
+                  {editingContactId ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
+                </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setShowAddContactModal(false)}
+                onClick={() => {
+                  setEditingContactId(null);
+                  setShowAddContactModal(false);
+                }}
                 className="p-1 rounded-full text-gray-500 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -610,11 +796,14 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
                   type="submit"
                   className="flex-1 py-3 bg-error text-white font-bold text-xs uppercase rounded-xl shadow-sm cursor-pointer hover:bg-error-container"
                 >
-                  Add Emergency Contact
+                  {editingContactId ? 'Save Contact' : 'Add Emergency Contact'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddContactModal(false)}
+                  onClick={() => {
+                    setEditingContactId(null);
+                    setShowAddContactModal(false);
+                  }}
                   className="py-3 px-4 bg-surface-container text-on-surface font-bold text-xs uppercase rounded-xl cursor-pointer"
                 >
                   Cancel

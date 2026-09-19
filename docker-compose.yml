@@ -44,7 +44,7 @@ services:
   admin_frontend:
     build: ./frontend/admin-portal
     ports:
-      - "3002:3001"
+      - "3001:3001"
     volumes:
       - /app/node_modules
 

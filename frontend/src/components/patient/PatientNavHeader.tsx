@@ -5,13 +5,24 @@ interface PatientHeaderProps {
   onOpenNotifications: () => void;
   onOpenProfile: () => void;
   unreadCount?: number;
+  patientProfile?: any;
+  showInstallPrompt?: boolean;
+  onInstallClick?: () => void;
 }
 
 export const PatientHeader: React.FC<PatientHeaderProps> = ({
   onOpenNotifications,
   onOpenProfile,
   unreadCount = 1,
+  patientProfile,
+  showInstallPrompt = false,
+  onInstallClick,
 }) => {
+  const displayName = patientProfile?.name || 'Patient Portal';
+  const displayPhoto =
+    patientProfile?.photo ||
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+
   return (
     <header className="fixed top-0 w-full z-40 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30 pt-safe">
       <div className="h-16 px-4 flex items-center justify-between gap-2 max-w-lg mx-auto">
@@ -24,12 +35,22 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
               MEDINEXUS PATIENT
             </span>
             <span className="font-headline-md text-[15px] leading-tight font-semibold text-on-surface">
-              Ananya Sharma
+              {displayName}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {showInstallPrompt && (
+            <button
+              type="button"
+              onClick={onInstallClick}
+              className="flex items-center gap-1 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-primary/90 transition-colors cursor-pointer mr-1"
+            >
+              <span className="material-symbols-outlined text-[14px]">download</span>
+              Install
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpenNotifications}
@@ -46,9 +67,9 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
             className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/40 cursor-pointer"
           >
             <img
-              alt="Ananya Sharma"
+              alt={displayName}
               className="w-full h-full object-cover"
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+              src={displayPhoto}
             />
           </button>
         </div>
@@ -66,7 +87,6 @@ export const PatientNav: React.FC<PatientNavProps> = ({ activeTab, onTabChange }
   const items: { tab: PatientTab; label: string; icon: string }[] = [
     { tab: 'home', label: 'Home', icon: 'home' },
     { tab: 'book', label: 'Book', icon: 'calendar_add_on' },
-    { tab: 'records', label: 'Records', icon: 'folder_shared' },
     { tab: 'profile', label: 'Profile', icon: 'person' },
   ];
 

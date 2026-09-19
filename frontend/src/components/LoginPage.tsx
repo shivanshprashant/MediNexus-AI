@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AppScreen } from '../types';
 
+import { loginUser, resetPasswordApi } from '../services/api';
+
 interface LoginPageProps {
   onLoginSuccess: (role: 'doctor' | 'patient', userName: string) => void;
   onNavigateScreen: (screen: AppScreen) => void;
@@ -11,37 +13,105 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigateScreen,
 }) => {
   const [selectedRole, setSelectedRole] = useState<'patient' | 'doctor'>('patient');
-  const [emailOrPhone, setEmailOrPhone] = useState('ananya.sharma@example.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Password Reset Modal State
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
+    setLoginError(null);
 
-    setTimeout(() => {
+    try {
+      const res = await loginUser({
+        email: emailOrPhone,
+        password: password,
+        role: selectedRole,
+      });
       setIsAuthenticating(false);
-      const nameMap = {
-        patient: 'Ananya Sharma',
-        doctor: 'Dr. Shiv Gupta',
-      };
-      onLoginSuccess(selectedRole, nameMap[selectedRole]);
-    }, 900);
+      onLoginSuccess(selectedRole, res.full_name || (selectedRole === 'patient' ? 'Patient' : 'Doctor'));
+    } catch (err: any) {
+      setIsAuthenticating(false);
+      setLoginError(err.message || 'Invalid email or password. Please try again.');
+    }
   };
 
-  const handleDemoSignIn = (role: 'patient' | 'doctor') => {
+  const handleDemoSignIn = async (role: 'patient' | 'doctor') => {
     setSelectedRole(role);
     setIsAuthenticating(true);
-    setTimeout(() => {
+    setLoginError(null);
+
+    const demoEmail = role === 'patient' ? 'ananya.sharma@example.com' : 'dr.shiv@citycare.org';
+    try {
+      const res = await loginUser({
+        email: demoEmail,
+        password: 'password123',
+        role: role,
+      });
       setIsAuthenticating(false);
-      const nameMap = {
-        patient: 'Ananya Sharma',
-        doctor: 'Dr. Shiv Gupta',
-      };
-      onLoginSuccess(role, nameMap[role]);
-    }, 700);
+      onLoginSuccess(role, res.full_name || (role === 'patient' ? 'Ananya Sharma' : 'Dr. Shiv Gupta'));
+    } catch (err: any) {
+      setIsAuthenticating(false);
+      setLoginError(err.message || 'Demo authentication failed. Please register your account first.');
+    }
+  };
+
+  const handleOpenResetModal = () => {
+    setResetEmail(emailOrPhone);
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    setResetError(null);
+    setResetSuccess(null);
+    setShowResetModal(true);
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSuccess(null);
+
+    if (!resetEmail.trim()) {
+      setResetError('Email address is required.');
+      return;
+    }
+
+    if (resetNewPassword.length < 6) {
+      setResetError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError('New passwords do not match.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const res = await resetPasswordApi({
+        email: resetEmail.trim(),
+        new_password: resetNewPassword,
+        role: selectedRole,
+      });
+      setIsResetting(false);
+      setResetSuccess(res.message || 'Password updated successfully! You can now log in.');
+      setEmailOrPhone(resetEmail.trim());
+      setPassword('');
+    } catch (err: any) {
+      setIsResetting(false);
+      setResetError(err.message || 'Failed to reset password. Please verify your email.');
+    }
   };
 
   return (
@@ -83,86 +153,92 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               Sign In to MediNexus AI
             </h1>
             <p className="text-xs text-[#526860] mt-0.5">
-              Access your patient portal or clinical physician queue
+              Secure Unified Healthcare Access • ABDM Compliant Node
             </p>
           </div>
 
-          {/* Role Selector */}
-          <div className="flex flex-col gap-2 p-1.5 bg-[#f0f6f2] rounded-xl border border-[#d2e2d8]">
+          {/* Role Toggle */}
+          <div className="grid grid-cols-2 p-1 bg-[#f0f6f3] rounded-xl border border-[#d2e2d8]">
             <button
               type="button"
-              onClick={() => {
-                setSelectedRole('patient');
-                setEmailOrPhone('ananya.sharma@example.com');
-              }}
-              className={`w-full py-2.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-between ${
+              onClick={() => setSelectedRole('patient')}
+              className={`py-2 text-xs font-bold font-label-caps uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 selectedRole === 'patient'
-                  ? 'bg-white text-[#1b3b32] shadow-2xs border border-[#c4ded3]'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-[#1b3b32] shadow-xs'
+                  : 'text-[#526860] hover:text-[#1b3b32]'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">person</span>
-                <span>Patient Account</span>
-              </div>
-              {selectedRole === 'patient' && <span className="text-[10px] font-mono font-bold text-[#2b8a66]">ACTIVE</span>}
+              Patient Portal
             </button>
-
             <button
               type="button"
-              onClick={() => {
-                setSelectedRole('doctor');
-                setEmailOrPhone('dr.shiv@citycare.org');
-              }}
-              className={`w-full py-2.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-between ${
+              onClick={() => setSelectedRole('doctor')}
+              className={`py-2 text-xs font-bold font-label-caps uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 selectedRole === 'doctor'
-                  ? 'bg-white text-[#1b3b32] shadow-2xs border border-[#c4ded3]'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[#258360] text-white shadow-xs'
+                  : 'text-[#526860] hover:text-[#1b3b32]'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">stethoscope</span>
-                <span>Doctor / Physician</span>
-              </div>
-              {selectedRole === 'doctor' && <span className="text-[10px] font-mono font-bold text-[#2b8a66]">ACTIVE</span>}
+              Doctor Portal
             </button>
           </div>
 
-          {/* Login Form */}
+          {loginError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">error</span>
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {resetSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-xl flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              <span>{resetSuccess}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Email Address or Phone Number
+              <label className="block text-xs font-bold font-label-caps text-[#526860] uppercase mb-1">
+                {selectedRole === 'patient' ? 'Email Address or Username' : 'Doctor Work Email'}
               </label>
               <input
                 type="text"
                 required
                 value={emailOrPhone}
                 onChange={(e) => setEmailOrPhone(e.target.value)}
-                className="w-full text-xs rounded-xl border border-gray-300 focus:border-[#1b3b32] focus:ring-1 focus:ring-[#1b3b32] bg-[#fafdfb] text-gray-900 py-2.5 px-3.5 outline-none font-medium"
-                placeholder="email@example.com or +91..."
+                placeholder={
+                  selectedRole === 'patient'
+                    ? 'e.g. Shivansh Prashant or Shiv@example.com'
+                    : 'e.g. dr.shiv@citycare.org'
+                }
+                className="w-full px-3.5 py-2.5 bg-[#fafdfb] border border-[#c4ded3] rounded-xl text-xs text-[#142620] focus:outline-none focus:ring-2 focus:ring-[#258360] focus:border-transparent transition-all"
               />
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-semibold text-gray-700">Password</label>
+              <label className="block text-xs font-bold font-label-caps text-[#526860] uppercase mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 bg-[#fafdfb] border border-[#c4ded3] rounded-xl text-xs text-[#142620] focus:outline-none focus:ring-2 focus:ring-[#258360] focus:border-transparent transition-all pr-10"
+                />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[11px] text-[#2b8a66] font-bold hover:underline"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  <span className="material-symbols-outlined text-[18px]">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
                 </button>
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full text-xs rounded-xl border border-gray-300 focus:border-[#1b3b32] focus:ring-1 focus:ring-[#1b3b32] bg-[#fafdfb] text-gray-900 py-2.5 px-3.5 outline-none"
-                placeholder="••••••••••••"
-              />
             </div>
 
             <div className="flex items-center justify-between text-xs">
@@ -177,8 +253,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </label>
               <button
                 type="button"
-                onClick={() => alert('Password reset link sent to registered email.')}
-                className="text-[#2b8a66] hover:underline font-semibold"
+                onClick={handleOpenResetModal}
+                className="text-[#2b8a66] hover:underline font-semibold cursor-pointer"
               >
                 Forgot password?
               </button>
@@ -247,6 +323,106 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Password Reset Modal Popup */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl space-y-4 border border-[#d2e2d8] animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#258360] text-[22px]">lock_reset</span>
+                <h3 className="font-headline-md text-base font-bold text-[#142620]">Reset Password</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {resetError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{resetError}</span>
+              </div>
+            )}
+
+            {resetSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-xl flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>{resetSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleResetSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold font-label-caps text-[#526860] uppercase mb-1">
+                  Registered Email Address or Username
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="e.g. Shivansh Prashant or Shiv@example.com"
+                  className="w-full px-3.5 py-2.5 bg-[#fafdfb] border border-[#c4ded3] rounded-xl text-xs text-[#142620] focus:outline-none focus:ring-2 focus:ring-[#258360]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold font-label-caps text-[#526860] uppercase mb-1">
+                  New Password (Min. 6 chars)
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  placeholder="Enter new secure password"
+                  className="w-full px-3.5 py-2.5 bg-[#fafdfb] border border-[#c4ded3] rounded-xl text-xs text-[#142620] focus:outline-none focus:ring-2 focus:ring-[#258360]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold font-label-caps text-[#526860] uppercase mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full px-3.5 py-2.5 bg-[#fafdfb] border border-[#c4ded3] rounded-xl text-xs text-[#142620] focus:outline-none focus:ring-2 focus:ring-[#258360]"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold text-xs uppercase rounded-xl hover:bg-gray-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResetting}
+                  className="flex-1 py-2.5 bg-[#1b3b32] text-white font-bold text-xs uppercase rounded-xl hover:bg-[#122822] shadow-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1"
+                >
+                  {isResetting ? (
+                    <span>Updating...</span>
+                  ) : (
+                    <span>Update Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="w-full max-w-5xl mx-auto px-6 py-4 text-center text-xs font-mono text-[#526860] border-t border-[#d2e2d8]">

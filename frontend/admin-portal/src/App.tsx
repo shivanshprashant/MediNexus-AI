@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HospitalAdminTab,
   DetailedHospital,
@@ -16,6 +16,13 @@ import {
   INITIAL_ACTIVITY_LOGS,
   INITIAL_HOSPITAL_NOTIFICATIONS,
 } from './services/hospitalAdminService';
+import {
+  fetchHospitalDetailsApi,
+  fetchEmergencyRequestsApi,
+  updateEmergencyStatusApi,
+  updateBedOccupancyApi,
+  subscribeEmergencyStreamApi,
+} from './services/adminApi';
 
 // Admin Components
 import { AdminLandingPage } from './components/AdminLandingPage';
@@ -71,12 +78,33 @@ export default function App() {
     }, 3200);
   };
 
+  // Real-time SSE Stream & Backend Fetch Sync
+  useEffect(() => {
+    if (currentScreen === 'dashboard') {
+      fetchEmergencyRequestsApi('hsp-001').then((data) => {
+        if (data && data.length > 0) setAdminEmergencyRequests(data);
+      });
+
+      const unsubscribe = subscribeEmergencyStreamApi('hsp-001', (evt) => {
+        if (evt.type === 'EMERGENCY_SOS') {
+          showToast(`🚨 REALTIME ALERT: ${evt.data.patientName || 'Emergency SOS'} triggered!`);
+          setAdminEmergencyRequests((prev) => [evt.data, ...prev]);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [currentScreen]);
+
   // Handlers for Department-Wise Resource Operations
   const handleUpdateDepartmentBedOccupied = (
     deptId: string,
     bedId: string,
     newOccupied: number
   ) => {
+    updateBedOccupancyApi(deptId, bedId, newOccupied).catch((err) => {
+      console.warn('Update bed occupancy API fallback:', err);
+    });
+
     setDetailedHospital((prev) => ({
       ...prev,
       departments: prev.departments.map((dept) => {
@@ -183,6 +211,10 @@ export default function App() {
 
   // Emergency Handlers
   const handleAcceptAdminEmergencyRequest = (requestId: string) => {
+    updateEmergencyStatusApi(requestId, 'ACCEPTED').catch((err) => {
+      console.warn('Accept emergency API fallback:', err);
+    });
+
     setAdminEmergencyRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: 'ACCEPTED' } : r))
     );
@@ -205,6 +237,10 @@ export default function App() {
   };
 
   const handleRejectAdminEmergencyRequest = (requestId: string) => {
+    updateEmergencyStatusApi(requestId, 'REJECTED').catch((err) => {
+      console.warn('Reject emergency API fallback:', err);
+    });
+
     setAdminEmergencyRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: 'REJECTED' } : r))
     );
@@ -230,6 +266,10 @@ export default function App() {
     requestId: string,
     newStatus: EmergencyRequestStatus
   ) => {
+    updateEmergencyStatusApi(requestId, newStatus).catch((err) => {
+      console.warn('Update emergency status API fallback:', err);
+    });
+
     setAdminEmergencyRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
     );

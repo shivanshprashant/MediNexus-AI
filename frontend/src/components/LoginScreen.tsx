@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserRole } from '../types';
+import { registerHospitalApi } from '../services/api';
 
 interface LoginScreenProps {
   onLoginSuccess: (role: 'doctor' | 'patient' | 'hospital_admin', userName: string) => void;
@@ -57,8 +58,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     startAuthSimulation('patient', patientName);
   };
 
-  const handleAdminSubmit = (e: React.FormEvent) => {
+  const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      await registerHospitalApi({
+        hospitalCode: adminHospitalCode,
+        name: `Hospital (${adminHospitalCode})`,
+        phone: '+91 11 4910 2000',
+        emergencyPhone: '+91 11 4910 2000',
+        email: adminEmail,
+        address: 'Institutional Area, Sector 44',
+        city: 'New Delhi',
+        state: 'Delhi NCR',
+        pincode: '110017',
+        adminName: adminName,
+        adminEmail: adminEmail,
+        adminPassword: adminPassword,
+      });
+    } catch (err) {
+      console.warn('Hospital registration warning:', err);
+    }
     startAuthSimulation('hospital_admin', adminName);
   };
 

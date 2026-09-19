@@ -8,40 +8,7 @@ export type AppScreen =
   | 'patient';
 
 export type DoctorTab = 'home' | 'patients' | 'schedule' | 'alerts' | 'profile';
-export type PatientTab =
-  | 'home'
-  | 'book'
-  | 'records'
-  | 'profile'
-  | 'ai'
-  | 'history'
-  | 'sos'
-  | 'clinics'
-  | 'emergency_view'
-  | 'video_view'
-  | 'video_choice';
-
-export type PathwayNextStep =
-  | 'EMERGENCY'
-  | 'URGENT_IN_PERSON'
-  | 'ROUTINE_CONSULTATION'
-  | 'VIDEO_PREFERRED'
-  | 'VIDEO_OR_IN_PERSON';
-
-export type ConsultationMode =
-  | 'NONE'
-  | 'IN_PERSON'
-  | 'VIDEO'
-  | 'VIDEO_OR_IN_PERSON';
-
-export interface PathwayResult {
-  next_step: PathwayNextStep;
-  consultation_mode: ConsultationMode;
-  target_department: string;
-  recommendation_title: string;
-  recommendation_summary: string;
-  primary_action_label: string;
-}
+export type PatientTab = 'home' | 'book' | 'records' | 'profile' | 'ai' | 'history' | 'sos' | 'clinics';
 
 export type EmergencyRequestSeverity = 'LOW' | 'MODERATE' | 'HIGH' | 'EMERGENCY';
 export type EmergencyRequestStatus =
@@ -206,15 +173,25 @@ export interface Hospital {
 }
 
 export interface ActiveSosState {
+  id?: string;
   active: boolean;
   mode: 'drive-in' | 'ambulance';
   patientName: string;
+  age?: string;
+  gender?: string;
+  complaint?: string;
   hospitalId: string;
   hospitalName: string;
   bedNo: string;
   status: 'en-route' | 'accepted' | 'redirected';
   redirectedHospitalName?: string;
   redirectedHospitalAddress?: string;
+  ambulanceNumber?: string;
+  driverName?: string;
+  driverPhone?: string;
+  ambulanceType?: string;
+  patientLocation?: string;
+  mapsLink?: string;
 }
 
 export interface Patient {
@@ -226,7 +203,7 @@ export interface Patient {
   gender: 'Male' | 'Female' | 'Other';
   blood: string;
   priority: 'HIGH' | 'NORMAL';
-  status: 'WAITING' | 'COMPLETED';
+  status: 'WAITING' | 'COMPLETED' | 'IN_CONSULTANCY' | 'IN_CONSULTATION';
   lastVisit: string;
   nextAppointment: string;
   allergies: string;
@@ -311,42 +288,3 @@ export interface NotificationItem {
   content?: string;
   patient?: Patient;
 }
-
-export interface DoctorProfileInfo {
-  name: string;
-  title: string;
-  hospital: string;
-  license: string;
-  abhaId: string;
-  room: string;
-  hours: string;
-  photo: string;
-}
-
-export type MedicalRecordCategory =
-  | 'Lab Report'
-  | 'Imaging'
-  | 'Prescription'
-  | 'Discharge Summary'
-  | 'Surgical Note'
-  | 'Follow-Up Note'
-  | 'Other';
-
-export interface MedicalRecord {
-  id: string;
-  patientId: string;
-  patientName: string;
-  patientMrn: string;
-  title: string;
-  category: MedicalRecordCategory;
-  date: string;
-  doctor: string;
-  department: string;
-  fileUrl: string;
-  fileType: 'pdf' | 'image' | 'dicom' | 'doc';
-  fileSize: string;
-  notes: string;
-  uploadedBy: 'doctor' | 'patient' | 'system';
-  tags: string[];
-}
-

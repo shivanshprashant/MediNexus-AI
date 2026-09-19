@@ -7,6 +7,7 @@ interface ConsultationScheduleViewProps {
   onOpenDetails: (apt: Appointment) => void;
   onReschedule: (apt: Appointment) => void;
   onCancel: (apt: Appointment) => void;
+  onOpenScheduleModal?: () => void;
 }
 
 export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> = ({
@@ -15,17 +16,37 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
   onOpenDetails,
   onReschedule,
   onCancel,
+  onOpenScheduleModal,
 }) => {
-  const [tab, setTab] = useState<'today' | 'upcoming' | 'completed' | 'cancelled'>('today');
+  const cancelledAppointments = appointments
+    .filter((a) => a.status === 'CANCELLED')
+    .slice(0, 5);
 
   const counts = {
     today: appointments.filter((a) => a.status === 'TODAY').length,
     upcoming: appointments.filter((a) => a.status === 'UPCOMING').length,
     completed: appointments.filter((a) => a.status === 'COMPLETED').length,
-    cancelled: appointments.filter((a) => a.status === 'CANCELLED').length,
+    cancelled: cancelledAppointments.length,
   };
 
-  const currentList = appointments.filter((a) => a.status.toLowerCase() === tab);
+  const getInitialTab = (): 'today' | 'upcoming' | 'completed' | 'cancelled' => {
+    if (counts.today > 0) return 'today';
+    if (counts.upcoming > 0) return 'upcoming';
+    if (counts.completed > 0) return 'completed';
+    return 'today';
+  };
+
+  const [tab, setTab] = useState<'today' | 'upcoming' | 'completed' | 'cancelled'>(getInitialTab);
+
+  React.useEffect(() => {
+    if (tab === 'today' && counts.today === 0 && counts.upcoming > 0) {
+      setTab('upcoming');
+    }
+  }, [appointments]);
+
+  const currentList = tab === 'cancelled'
+    ? cancelledAppointments
+    : appointments.filter((a) => a.status.toLowerCase() === tab);
 
   return (
     <div className="flex flex-col w-full px-4 pt-2 pb-36 max-w-lg mx-auto">
@@ -34,10 +55,15 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
           <span className="font-label-caps text-primary tracking-widest uppercase text-[11px] font-bold">Clinical Roster</span>
           <h1 className="font-headline-md text-2xl font-bold text-on-surface">Consultation Schedule</h1>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant font-data-mono text-[12px] shadow-sm font-semibold">
-          <span className="material-symbols-outlined text-[16px] text-primary">calendar_clock</span>
-          <span>Sep 12, 2026</span>
-        </div>
+        {onOpenScheduleModal && (
+          <button
+            onClick={onOpenScheduleModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-on-primary font-label-caps text-[12px] font-bold uppercase shadow-sm hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">add_circle</span>
+            <span>New Visit</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">
@@ -95,13 +121,7 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
                   <div className="font-data-mono text-[11px] text-on-surface-variant mt-0.5">{apt.mrn} • {apt.ageGender}</div>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-full font-label-caps text-[10px] uppercase font-bold ${
-                apt.status === 'CANCELLED'
-                  ? 'bg-error/15 text-error'
-                  : apt.status === 'COMPLETED'
-                  ? 'bg-secondary-container text-on-secondary-container'
-                  : 'bg-primary/10 text-primary'
-              }`}>
+              <span className="px-2 py-0.5 rounded-full font-label-caps text-[10px] uppercase font-bold bg-primary/10 text-primary">
                 {apt.status}
               </span>
             </div>
@@ -125,69 +145,40 @@ export const ConsultationScheduleView: React.FC<ConsultationScheduleViewProps> =
               <strong className="text-on-surface font-semibold">Chief Complaint: </strong>{apt.reason}
             </div>
 
-            {apt.status === 'CANCELLED' ? (
-              <div className="flex gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {apt.status !== 'CANCELLED' ? (
                 <button
-                  onClick={() => onOpenDetails(apt)}
-                  className="flex-1 py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
+                  onClick={() => onStartConsult(apt)}
+                  className="py-2.5 px-3 rounded-lg bg-primary text-on-primary font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
                 >
-                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                  <span>View Details</span>
+                  <span className="material-symbols-outlined text-[16px]">stethoscope</span>
+                  <span>Start Consult</span>
                 </button>
-                <button
-                  onClick={() => onReschedule(apt)}
-                  className="flex-1 py-2.5 px-3 rounded-lg bg-primary text-white font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
-                >
-                  <span className="material-symbols-outlined text-[16px]">calendar_month</span>
-                  <span>Re-Book / Reschedule</span>
-                </button>
-              </div>
-            ) : apt.status === 'COMPLETED' ? (
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => onOpenDetails(apt)}
-                  className="flex-1 py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
-                >
-                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                  <span>Medical Record</span>
-                </button>
-                <button
-                  onClick={() => onReschedule(apt)}
-                  className="flex-1 py-2.5 px-3 rounded-lg bg-secondary-container text-on-secondary-container font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer font-bold"
-                >
-                  <span className="material-symbols-outlined text-[16px]">event_repeat</span>
-                  <span>Follow-Up Consult</span>
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    onClick={() => onStartConsult(apt)}
-                    className="py-2.5 px-3 rounded-lg bg-primary text-on-primary font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-bold"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">stethoscope</span>
-                    <span>Start Consult</span>
-                  </button>
-                  <button
-                    onClick={() => onOpenDetails(apt)}
-                    className="py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">visibility</span>
-                    <span>View Details</span>
-                  </button>
+              ) : (
+                <div className="py-2.5 px-3 rounded-lg bg-red-50 text-red-700 font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 font-bold">
+                  <span className="material-symbols-outlined text-[16px]">cancel</span>
+                  <span>Cancelled</span>
                 </div>
+              )}
+              <button
+                onClick={() => onOpenDetails(apt)}
+                className="py-2.5 px-3 rounded-lg bg-surface-container text-on-surface font-label-caps text-xs uppercase flex items-center justify-center gap-1.5 hover:bg-surface-container-high cursor-pointer font-semibold"
+              >
+                <span className="material-symbols-outlined text-[16px]">visibility</span>
+                <span>View Details</span>
+              </button>
+            </div>
 
-                <div className="flex items-center justify-end gap-3 pt-0.5 text-[12px]">
-                  <button onClick={() => onReschedule(apt)} className="text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
-                    <span className="material-symbols-outlined text-[14px]">calendar_month</span> Reschedule
-                  </button>
-                  <span className="text-gray-300">•</span>
-                  <button onClick={() => onCancel(apt)} className="text-error font-semibold flex items-center gap-1 cursor-pointer hover:underline">
-                    <span className="material-symbols-outlined text-[14px]">cancel</span> Cancel
-                  </button>
-                </div>
-              </>
+            {apt.status !== 'CANCELLED' && (
+              <div className="flex items-center justify-end gap-3 pt-0.5 text-[12px]">
+                <button onClick={() => onReschedule(apt)} className="text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                  <span className="material-symbols-outlined text-[14px]">calendar_month</span> Reschedule
+                </button>
+                <span className="text-gray-300">•</span>
+                <button onClick={() => onCancel(apt)} className="text-error font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                  <span className="material-symbols-outlined text-[14px]">cancel</span> Cancel
+                </button>
+              </div>
             )}
           </div>
         ))}

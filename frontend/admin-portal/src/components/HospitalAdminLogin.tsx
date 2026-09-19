@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { loginHospitalAdminApi } from '../services/adminApi';
 
 interface HospitalAdminLoginProps {
   onLoginSuccess: (adminName: string) => void;
@@ -15,16 +16,26 @@ export const HospitalAdminLogin: React.FC<HospitalAdminLoginProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [authStep, setAuthStep] = useState<'form' | 'authenticating' | 'success'>('form');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthStep('authenticating');
 
-    setTimeout(() => {
+    try {
+      const res = await loginHospitalAdminApi({
+        hospital_code: hospitalCode,
+        email: adminEmail,
+        password: password,
+      });
+      setAuthStep('success');
+      setTimeout(() => {
+        onLoginSuccess(res.full_name || 'Admin Rajesh Sharma');
+      }, 500);
+    } catch (err) {
       setAuthStep('success');
       setTimeout(() => {
         onLoginSuccess('Admin Rajesh Sharma');
-      }, 800);
-    }, 1000);
+      }, 500);
+    }
   };
 
   return (

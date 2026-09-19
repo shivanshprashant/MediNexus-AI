@@ -1,23 +1,24 @@
 import React from 'react';
-import { DoctorTab, DoctorProfileInfo } from '../../types';
+import { DoctorTab } from '../../types';
 
 interface DoctorHeaderProps {
   onOpenNotifications: () => void;
   onOpenProfile: () => void;
   unreadNotificationsCount: number;
-  docProfile?: DoctorProfileInfo;
+  doctorProfile?: any;
 }
 
 export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
   onOpenNotifications,
   onOpenProfile,
   unreadNotificationsCount,
-  docProfile,
+  doctorProfile,
 }) => {
-  const doctorName = docProfile?.name || 'Dr. Shiv Gupta';
-  const doctorPhoto =
-    docProfile?.photo ||
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDE5t9YjgeORyB6vFfCDeIIIaRa432s4mT_3YjpsWo-llKbwGnOLc8BKHDHcqmz5GpOlyJOVFrtuKF5I43P6I7eZZ2uW_BDtLh-A8GN8ZiefSEeSBGN-8ZWibU6JNb0cN76L92nwC5-8twN7TBjX-4GNbXUWCA3psZCFkMY8kAtsadai5vRAwpVRf9INwyO7cSeY9EE8BXPQIDdJd4ajy3WT9SpCfJeFylNWXlkFd86jBdEpw12yohFgg';
+  const doctorName = doctorProfile?.name || 'Doctor Station';
+  const rawPhoto = doctorProfile?.photo;
+  const photoUrl = rawPhoto
+    ? (rawPhoto.startsWith('http') ? rawPhoto : `http://localhost:8000${rawPhoto}`)
+    : "https://lh3.googleusercontent.com/aida/AEtjO1WdsLknfBntsioHzvTNxERoyz2hVIQA5HhaO5cCN1i-10yxl6xUHh2PPNmqm2wd_E8helijvNtRZetVOoxy7oiqmYdZ342pdxHfW3hjbPZxw_oaQWMW94cI5ieLwWASG3leEiKlrmnw_hfUJsK5NQVcJoPO4qBLP9ZS3wgv0IUJq-UYpwylhakjjAX7sG10_nXQZm9gveWTqJS1HhOl6FHD_SGX6EMiUN7_PszWs0slLRGsPbCBuDxRpsiH";
 
   return (
     <header className="fixed top-0 w-full z-40 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30 pt-safe transition-shadow duration-200">
@@ -58,7 +59,7 @@ export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
             <img
               alt={doctorName}
               className="w-8 h-8 rounded-full object-cover border border-outline-variant/40"
-              src={doctorPhoto}
+              src={photoUrl}
             />
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-surface"></span>
           </button>
@@ -67,4 +68,3 @@ export const DoctorHeader: React.FC<DoctorHeaderProps> = ({
     </header>
   );
 };
-
