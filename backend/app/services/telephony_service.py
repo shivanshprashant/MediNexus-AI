@@ -87,3 +87,50 @@ async def initiate_driver_call(to_number: str = None, patient_name: str = "Patie
         "to": dest_number,
         "from": from_number,
     }
+
+
+async def send_sms(to_number: str, message: str) -> dict:
+    """
+    Sends an SMS via Twilio REST API. Gracefully falls back if keys missing.
+    """
+    import os
+    account_sid = os.getenv("TELEPHONY_ACCOUNT_ID", "").strip()
+    auth_token = os.getenv("TELEPHONY_AUTH_TOKEN", "").strip()
+    from_number = os.getenv("TELEPHONY_FROM_NUMBER", "").strip()
+    
+    if not account_sid or "placeholder" in account_sid.lower():
+        logger.warning(f"Twilio API key not configured. Mock SMS to {to_number}: {message}")
+        return {"status": "fallback", "message": "SMS dispatched via fallback mockup."}
+        
+    if not to_number.startswith("+"):
+        if len(to_number) == 10 and to_number.isdigit():
+            to_number = f"+91{to_number}"
+        else:
+            to_number = f"+{to_number}"
+            
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    
+    payload = {
+        "To": to_number,
+        "From": from_number,
+        "Body": message
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                url,
+                data=payload,
+                auth=(account_sid, auth_token),
+            )
+            
+        if response.status_code in (200, 201):
+            logger.info(f"Twilio SMS sent to {to_number}")
+            return {"status": "success", "message": "SMS sent successfully."}
+        else:
+            logger.error(f"Twilio SMS failed ({response.status_code}): {response.text}")
+            return {"status": "error", "message": "Failed to dispatch SMS."}
+    except Exception as e:
+        logger.error(f"Twilio SMS network error: {e}")
+        return {"status": "error", "message": "Network error during SMS dispatch."}
+

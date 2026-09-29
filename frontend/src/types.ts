@@ -191,6 +191,8 @@ export interface ActiveSosState {
   driverPhone?: string;
   ambulanceType?: string;
   patientLocation?: string;
+  patientLatitude?: number;
+  patientLongitude?: number;
   mapsLink?: string;
 }
 

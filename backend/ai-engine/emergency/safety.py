@@ -224,6 +224,24 @@ def validate_emergency_assessment(
             "Seek immediate professional medical care."
         ]
 
+    # Validate Guidance Consistency
+    filtered_guidance = []
+    # If the event is clearly an eye issue, and NOT a thermal burn, strip thermal burn guidance
+    is_eye = assessment.anatomical_context and any("eye" in ctx.lower() for ctx in assessment.anatomical_context)
+    is_burn = assessment.event_type and "burn" in assessment.event_type.lower()
+    has_thermal_exposure = any("hot" in exp.lower() or "fire" in exp.lower() or "boiling" in exp.lower() or "thermal" in exp.lower() for exp in assessment.explicit_exposures)
+
+    for step in assessment.immediate_guidance:
+        step_lower = step.lower()
+        if not is_burn and not has_thermal_exposure:
+            if any(term in step_lower for term in ["blister", "cling film", "butter", "burn dressing", "cool the burn"]):
+                if request_id:
+                    print(f"[{request_id}] STRIPPED INVALID GUIDANCE: {step}", flush=True)
+                continue
+        filtered_guidance.append(step)
+
+    assessment.immediate_guidance = filtered_guidance
+
     if request_id:
         print(f"[{request_id}] SAFETY_LAYER_OUTPUT:\n{assessment.json()}", flush=True)
 

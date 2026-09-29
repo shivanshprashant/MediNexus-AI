@@ -41,16 +41,6 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {showInstallPrompt && (
-            <button
-              type="button"
-              onClick={onInstallClick}
-              className="flex items-center gap-1 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-primary/90 transition-colors cursor-pointer mr-1"
-            >
-              <span className="material-symbols-outlined text-[14px]">download</span>
-              Install
-            </button>
-          )}
           <button
             type="button"
             onClick={onOpenNotifications}

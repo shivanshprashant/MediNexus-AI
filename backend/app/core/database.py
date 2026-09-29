@@ -9,7 +9,7 @@ pool: asyncpg.Pool = None
 async def init_db_pool():
     global pool
     try:
-        dsn = settings.DATABASE_URL
+        dsn = settings.database_url
         if dsn.startswith("postgresql+asyncpg://"):
             dsn = dsn.replace("postgresql+asyncpg://", "postgresql://", 1)
 
@@ -51,10 +51,33 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(50),
     role VARCHAR(20) NOT NULL CHECK (role IN ('patient', 'doctor', 'hospital_admin')),
     hospital_id VARCHAR(50),
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id          SERIAL PRIMARY KEY,
+    user_id     VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  TEXT UNIQUE NOT NULL,
+    revoked     BOOLEAN NOT NULL DEFAULT false,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          SERIAL PRIMARY KEY,
+    user_id     VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    action      TEXT NOT NULL,
+    ip_address  TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+
 -- 2. Hospitals Table
+
 CREATE TABLE IF NOT EXISTS hospitals (
     id VARCHAR(50) PRIMARY KEY,
     hospital_code VARCHAR(50) UNIQUE NOT NULL,
@@ -398,8 +421,8 @@ async def create_schema_if_not_exists():
         # ── Hospital Admin User for CityCare (HSP-001) ──
         await conn.execute("""
             INSERT INTO users (id, email, hashed_password, role, full_name, phone, hospital_id)
-            VALUES ('usr-admin-hsp001', 'admin@citycare.org', '$2b$12$vBF1qHU5xbAMqu078mzJt.nj/KH3ZSRH4R7IfE3sW.k.9iHtUH3R.', 'hospital_admin', 'Admin Rajesh Sharma', '+91 11 4910 2000', 'hsp-001')
-            ON CONFLICT (email) DO UPDATE SET id = 'usr-admin-hsp001', hospital_id = 'hsp-001', role = 'hospital_admin', hashed_password = '$2b$12$vBF1qHU5xbAMqu078mzJt.nj/KH3ZSRH4R7IfE3sW.k.9iHtUH3R.';
+            VALUES ('usr-admin-hsp001', 'admin@citycare.org', '$2b$12$asKDdofjARikvWNHEm5V.OmXgg1B3O3kJ/jsD1dfHaICjNcaiMHZ6', 'hospital_admin', 'Admin Rajesh Sharma', '+91 11 4910 2000', 'hsp-001')
+            ON CONFLICT (email) DO UPDATE SET id = 'usr-admin-hsp001', hospital_id = 'hsp-001', role = 'hospital_admin', hashed_password = '$2b$12$asKDdofjARikvWNHEm5V.OmXgg1B3O3kJ/jsD1dfHaICjNcaiMHZ6';
         """)
 
         # ── Second Hospital: Apollo Hospital (HSP-002) for isolation testing ──
@@ -431,6 +454,42 @@ async def create_schema_if_not_exists():
             INSERT INTO doctors (id, user_id, hospital_id, department_id, doctor_code, name, specialization, qualification, experience_years, contact_phone, email, shift, availability)
             VALUES ('doc-apollo-001', NULL, 'hsp-002', 'dept-apollo-er', 'DOC-APL-ER-101', 'Dr. Ravi Shankar', 'Emergency Medicine', 'MD (Emergency Medicine)', 12, '+91 98200 11223', 'dr.ravi@apollo.org', 'Morning Shift', 'ON DUTY'),
                    ('doc-apollo-002', NULL, 'hsp-002', 'dept-apollo-cardio', 'DOC-APL-CARD-201', 'Dr. Sunita Kapoor', 'Cardiologist', 'DM (Cardiology)', 14, '+91 98200 22334', 'dr.sunita@apollo.org', 'Day Shift', 'ON DUTY')
+            ON CONFLICT (id) DO NOTHING;
+        """)
+
+        # ── Third Hospital: AIIMS Bhopal (HSP-003) ──
+        await conn.execute("""
+            INSERT INTO hospitals (id, hospital_code, name, type, phone, emergency_phone, ambulance_phone, email, address, city, state, pincode, is_24x7_emergency, trauma_care_available, ambulance_available, admin_name, admin_email)
+            VALUES ('hsp-003', 'HSP-003', 'AIIMS Bhopal', 'Government Multi-Specialty Hospital', '+91 755 267 2320', '+91 755 267 2321', '+91 755 267 2322', 'admin@aiimsbhopal.edu.in', 'Saket Nagar', 'Bhopal', 'Madhya Pradesh', '462020', TRUE, TRUE, TRUE, 'Admin Ramesh', 'admin@aiimsbhopal.edu.in')
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        await conn.execute("""
+            INSERT INTO hospital_departments (id, hospital_id, code, name, description, contact_phone, is_24x7, has_emergency_support)
+            VALUES ('dept-aiims-er', 'hsp-003', 'ER-01', 'Emergency Medicine & Trauma', 'Level 1 Trauma Bay', '+91 755 267 2321', TRUE, TRUE),
+                   ('dept-aiims-cardio', 'hsp-003', 'CARDIO-01', 'Cardiology & Vascular Medicine', 'Advanced CCU & Cath Lab', '+91 755 267 2323', TRUE, TRUE)
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        await conn.execute("""
+            INSERT INTO department_beds (id, department_id, bed_type, total, occupied, available, floor_ward)
+            VALUES ('b-aiims-er-1', 'dept-aiims-er', 'Emergency Triage Beds', 20, 10, 10, 'ER Bay Alpha'),
+                   ('b-aiims-cardio-1', 'dept-aiims-cardio', 'Cardiac ICU Bed', 15, 8, 7, 'CCU Wing 1')
+            ON CONFLICT (id) DO NOTHING;
+        """)
+
+        # ── Fourth Hospital: Bansal Hospital Bhopal (HSP-004) ──
+        await conn.execute("""
+            INSERT INTO hospitals (id, hospital_code, name, type, phone, emergency_phone, ambulance_phone, email, address, city, state, pincode, is_24x7_emergency, trauma_care_available, ambulance_available, admin_name, admin_email)
+            VALUES ('hsp-004', 'HSP-004', 'Bansal Hospital', 'Private Multi-Specialty Hospital', '+91 755 408 6000', '+91 755 408 6099', '+91 755 408 6100', 'info@bansalhospital.com', 'Shahpura', 'Bhopal', 'Madhya Pradesh', '462016', TRUE, TRUE, TRUE, 'Admin Sushil', 'info@bansalhospital.com')
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        await conn.execute("""
+            INSERT INTO hospital_departments (id, hospital_id, code, name, description, contact_phone, is_24x7, has_emergency_support)
+            VALUES ('dept-bansal-er', 'hsp-004', 'ER-01', 'Emergency Medicine & Trauma', 'Advanced ER', '+91 755 408 6099', TRUE, TRUE)
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        await conn.execute("""
+            INSERT INTO department_beds (id, department_id, bed_type, total, occupied, available, floor_ward)
+            VALUES ('b-bansal-er-1', 'dept-bansal-er', 'Emergency Triage Beds', 10, 2, 8, 'ER Wing')
             ON CONFLICT (id) DO NOTHING;
         """)
         logger.info("Non-destructive schema verification complete.")

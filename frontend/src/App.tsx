@@ -453,7 +453,7 @@ const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_N
 
     const defaultLat = 28.6280;
     const defaultLng = 77.3649;
-    const defaultMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${defaultLat},${defaultLng}`;
+    const defaultMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${defaultLat},${defaultLng}&travelmode=driving&dir_action=navigate`;
 
     const sosObj: ActiveSosState = {
       active: true,
@@ -474,6 +474,10 @@ const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_N
 
     const triggerSOSWithCoords = (lat?: number, lng?: number) => {
       const locStr = (lat && lng) ? `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)} (${patientLoc})` : patientLoc;
+      const actualLat = lat || defaultLat;
+      const actualLng = lng || defaultLng;
+      const dynamicMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(chosenHosp.address || chosenHosp.name)}&origin=${actualLat},${actualLng}&travelmode=driving&dir_action=navigate`;
+
       triggerEmergencySosApi({
         mode,
         target_hospital_id: chosenHosp.id || 'hsp-001',
@@ -483,8 +487,8 @@ const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_N
         age_gender: `${activeAge} / ${activeGender}`,
         medical_info: activeMedInfo,
         patient_location: locStr,
-        patient_latitude: lat || defaultLat,
-        patient_longitude: lng || defaultLng,
+        patient_latitude: actualLat,
+        patient_longitude: actualLng,
       }).then((created) => {
         if (created && created.id) {
           setActiveSos((prev) => (prev ? {
@@ -495,7 +499,9 @@ const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_N
             driverPhone: created.driverPhone || '+91 83039 36384',
             ambulanceType: created.ambulanceType || 'ALS (Advanced Life Support)',
             patientLocation: created.patientLocation || locStr,
-            mapsLink: created.mapsLink || defaultMapsLink,
+            mapsLink: created.mapsLink || dynamicMapsLink,
+            patientLatitude: actualLat,
+            patientLongitude: actualLng,
           } : prev));
         }
       }).catch((err) => {

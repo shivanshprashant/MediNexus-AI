@@ -113,6 +113,33 @@ async def mark_notification_read(
             content=r["content"]
         )
 
+from pydantic import BaseModel
+class SendNotificationRequest(BaseModel):
+    to_email: Optional[str] = None
+    to_phone: Optional[str] = None
+    subject: str
+    message: str
+
+@router.post("/send")
+async def send_external_notification(req: SendNotificationRequest):
+    """
+    Dispatches notifications to external services (Email & SMS).
+    """
+    from app.services.email_service import send_email
+    from app.services.telephony_service import send_sms
+    
+    results = {}
+    
+    if req.to_email:
+        email_res = await send_email(req.to_email, req.subject, req.message)
+        results["email"] = email_res
+        
+    if req.to_phone:
+        sms_res = await send_sms(req.to_phone, req.message)
+        results["sms"] = sms_res
+        
+    return {"status": "success", "results": results}
+
 @router.get("/stream")
 async def sse_notifications_stream(
     request: Request,

@@ -2,4 +2,12 @@ node_modules/
 __pycache__/
 venv/
 .env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.template
 .DS_Store
+*.log
+scratch/
+medinexus-security-implementation/

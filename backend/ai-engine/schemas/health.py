@@ -40,6 +40,12 @@ class HealthAssessment(BaseModel):
     subject: Optional[str] = None
     current_event: Optional[bool] = None
 
+    anatomical_context: List[str] = Field(default_factory=list)
+    symptoms: List[str] = Field(default_factory=list)
+    explicit_exposures: List[str] = Field(default_factory=list)
+    red_flags: List[str] = Field(default_factory=list)
+    missing_critical_information: List[str] = Field(default_factory=list)
+
     next_step: Optional[NextStepType] = None
     consultation_mode: Optional[ConsultationModeType] = None
 

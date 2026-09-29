@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Hospital, ActiveSosState } from '../../types';
-import { analyzeSymptomsApi, triggerEmergencySosApi, fetchHospitalAmbulanceNumberApi } from '../../services/api';
+import { analyzeSymptomsApi, triggerEmergencySosApi, fetchHospitalAmbulanceNumberApi, calculateRouteApi } from '../../services/api';
 
 interface PatientModalsProps {
   showSOS: boolean;
@@ -49,6 +49,26 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
   onSubmitAdmissionRequest,
 }) => {
   const [symptomText, setSymptomText] = useState('Feeling mild tightness in chest after climbing stairs.');
+  const [routeData, setRouteData] = useState<any>(null);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+
+  React.useEffect(() => {
+    if (activeSos?.mode === 'drive-in') {
+      const fetchRoute = async () => {
+        try {
+          const origin = (activeSos.patientLatitude && activeSos.patientLongitude)
+            ? `${activeSos.patientLatitude},${activeSos.patientLongitude}`
+            : "Current Location";
+          const destination = activeSos.redirectedHospitalAddress || hospitals.find((h: Hospital) => h.id === activeSos.hospitalId)?.address || activeSos.hospitalName || "Hospital";
+          const data = await calculateRouteApi(origin, destination);
+          setRouteData(data);
+        } catch (err) {
+          console.error("Route fetch failed", err);
+        }
+      };
+      fetchRoute();
+    }
+  }, [activeSos?.mode, activeSos?.status, activeSos?.redirectedHospitalAddress, activeSos?.hospitalId, activeSos?.hospitalName, hospitals]);
   const [triageResult, setTriageResult] = useState<null | { 
     level: 'Routine' | 'Urgent' | 'Emergency'; 
     rec: string;
@@ -165,37 +185,51 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
 
   const handleAssessSymptoms = async () => {
     setAssessing(true);
+    setTriageResult(null); // Phase 19: CLEAR previous result state
     try {
       const res = await analyzeSymptomsApi(symptomText);
       setAssessing(false);
-      const level = res.level || 'Urgent';
+      const level = res.level || 'Routine';
       
       setTriageResult({
         level: level,
-        rec: res.recommendation || 'Potential exertional angina presentation.',
+        severity: res.severity,
+        rec: res.recommendation,
         input_intent: res.input_intent,
         next_step: res.next_step,
         immediate_guidance: res.immediate_guidance,
         required_care: res.required_care,
         event_type: res.event_type,
-        department: res.recommended_department
+        department: res.required_care || res.department || res.recommended_department
       });
 
-      if (level === 'Emergency' || res.priority === 'EMERGENCY') {
+      if (res.emergency === true || res.severity === 'EMERGENCY' || level === 'Emergency') {
         onCloseAITriage();
         if (onOpenSOS) onOpenSOS();
       }
     } catch (err) {
       setAssessing(false);
-      if (symptomText.toLowerCase().includes('chest') || symptomText.toLowerCase().includes('tight')) {
+      // Fallback if backend is completely unreachable — use simple local heuristic
+      const lower = symptomText.toLowerCase();
+      const hasSevere = ['severe', 'crushing', 'unbearable', 'can\'t breathe', 'unconscious', 'collapse'].some(kw => lower.includes(kw));
+      const hasMild = ['mild', 'slight', 'little', 'after climbing', 'after stairs', 'after exercise'].some(kw => lower.includes(kw));
+      
+      if (hasSevere) {
+        setTriageResult({
+          level: 'Emergency',
+          rec: 'Critical symptoms detected. Please call emergency services (112) or proceed to the nearest ER immediately.',
+        });
+        onCloseAITriage();
+        if (onOpenSOS) onOpenSOS();
+      } else if (!hasMild && ['chest pain', 'heart', 'difficulty breathing'].some(kw => lower.includes(kw))) {
         setTriageResult({
           level: 'Urgent',
-          rec: 'Potential exertional angina presentation. Immediate resting recommended. Please schedule an urgent consult with Dr. Shiv Gupta or visit OPD-B.',
+          rec: 'Potential cardiac or respiratory concern. Schedule an urgent consultation today. Rest and avoid exertion.',
         });
       } else {
         setTriageResult({
           level: 'Routine',
-          rec: 'Mild presentation. Continue regular monitoring and stay well hydrated. Book regular appointment if symptoms persist.',
+          rec: 'Mild presentation. Continue regular monitoring and stay well hydrated. Book a regular appointment if symptoms persist.',
         });
       }
     }
@@ -474,107 +508,76 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
                   </div>
                 )}
 
-                {/* Interactive Map Canvas Mock */}
-                <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-outline-variant/40 bg-slate-900 shadow-inner flex flex-col justify-between p-3">
-                  {/* Map SVG Graphic */}
-                  <svg className="absolute inset-0 w-full h-full opacity-60" viewBox="0 0 400 180" fill="none">
-                    {/* Grid Roads */}
-                    <path d="M 20 40 L 380 40" stroke="#334155" strokeWidth="6" />
-                    <path d="M 20 120 L 380 120" stroke="#334155" strokeWidth="6" />
-                    <path d="M 120 10 L 120 170" stroke="#334155" strokeWidth="6" />
-                    <path d="M 280 10 L 280 170" stroke="#334155" strokeWidth="6" />
-                    {/* Live Route Line (Neon Green) */}
-                    <path d="M 40 120 L 120 120 L 120 40 L 280 40 L 280 90" stroke={activeSos.status === 'redirected' ? '#f59e0b' : '#10b981'} strokeWidth="5" strokeDasharray="8 4" className="animate-pulse" />
-                    {/* User Dot */}
-                    <circle cx="40" cy="120" r="8" fill="#3b82f6" stroke="#ffffff" strokeWidth="2" />
-                    {/* Hospital Pin */}
-                    <circle cx="280" cy="90" r="10" fill={activeSos.status === 'redirected' ? '#d97706' : '#ef4444'} stroke="#ffffff" strokeWidth="2" />
-                  </svg>
-
-                  {/* Top Stats Overlay */}
-                  <div className="relative z-10 flex justify-between items-center bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-white text-xs font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2.5 h-2.5 rounded-full ${activeSos.status === 'redirected' ? 'bg-amber-400' : 'bg-emerald-400'} animate-ping`}></span>
-                      <span>{activeSos.status === 'redirected' ? 'Updated GPS Route' : 'Live GPS Route'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 font-mono text-[11px]">
-                      <span>{activeSos.status === 'redirected' ? '2.4 km' : '1.8 km'}</span>
-                      <span>•</span>
-                      <span className={`${activeSos.status === 'redirected' ? 'text-amber-400' : 'text-emerald-400'} font-bold`}>
-                        {activeSos.status === 'redirected' ? '8 Mins Est.' : '6 Mins Est.'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Destination Info Overlay */}
-                  <div className="relative z-10 bg-slate-800/90 backdrop-blur-md p-2.5 rounded-xl text-white text-xs border border-white/10 flex justify-between items-center">
-                    <div className="min-w-0 pr-2">
-                      <span className="text-[10px] text-emerald-400 uppercase font-bold block">
-                        {activeSos.status === 'redirected' ? 'Rerouted Destination' : 'Destination'}
-                      </span>
-                      <strong className="text-xs truncate block max-w-[240px] text-amber-300 font-bold">
+                {/* Live Google Maps Integration without internal overlays */}
+                <div className="flex flex-col space-y-3 mt-1">
+                  
+                  {/* Route Stats & Destination Info (Moved outside map) */}
+                  <div className="bg-slate-900 rounded-xl p-3 border border-outline-variant/40 flex justify-between items-center shadow-sm">
+                    <div className="min-w-0 pr-3">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={`w-2 h-2 rounded-full ${activeSos.status === 'redirected' ? 'bg-amber-400' : 'bg-emerald-400'} animate-pulse`}></span>
+                        <span className={`text-[10px] uppercase font-bold tracking-wider ${activeSos.status === 'redirected' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {activeSos.status === 'redirected' ? 'Rerouted to' : 'Destination'}
+                        </span>
+                      </div>
+                      <strong className="text-[13px] truncate block max-w-[200px] text-white">
                         {activeSos.redirectedHospitalName || activeSos.hospitalName}
                       </strong>
-                      {(activeSos.redirectedHospitalAddress || selectedHospital?.address) && (
-                        <span className="text-[10px] text-slate-300 truncate block max-w-[240px]">
-                          {activeSos.redirectedHospitalAddress || selectedHospital?.address}
-                        </span>
-                      )}
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                      activeSos.status === 'redirected' ? 'bg-amber-500 text-white' : 'bg-emerald-500/20 text-emerald-300'
-                    }`}>
-                      {activeSos.status === 'redirected' ? 'REROUTED' : 'CLEAR TRAFFIC'}
-                    </span>
                   </div>
+
+                  {/* Clean Map Canvas */}
+                  <div className="relative w-full h-56 rounded-2xl overflow-hidden border border-outline-variant/40 bg-slate-200 shadow-inner group">
+                    <iframe 
+                      title="Live Route Map"
+                      className="absolute inset-0 w-full h-full" 
+                      frameBorder="0" 
+                      scrolling="no" 
+                      marginHeight={0} 
+                      marginWidth={0} 
+                      src={`https://maps.google.com/maps?daddr=${encodeURIComponent(routeData?.end_address || activeSos.redirectedHospitalAddress || selectedHospital?.address || activeSos.hospitalName || 'Hospital')}${activeSos.patientLatitude && activeSos.patientLongitude ? `&saddr=${activeSos.patientLatitude},${activeSos.patientLongitude}` : ''}&output=embed`}
+                    ></iframe>
+                    
+                    <a 
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(routeData?.end_address || activeSos.redirectedHospitalAddress || selectedHospital?.address || activeSos.hospitalName || 'Hospital')}${activeSos.patientLatitude && activeSos.patientLongitude ? `&origin=${activeSos.patientLatitude},${activeSos.patientLongitude}` : ''}&travelmode=driving&dir_action=navigate`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-2 right-2 bg-blue-600/95 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg border border-blue-500 text-white hover:bg-blue-700 hover:shadow-xl transition-all z-10 flex items-center gap-1.5 font-bold text-xs"
+                      title="Start Live Driving Navigation"
+                    >
+                      <span className="material-symbols-outlined text-[16px] block">navigation</span>
+                      Start Navigation
+                    </a>
+                  </div>
+                  
+                  {/* Turn-by-Turn GPS Directions */}
+                  {routeData?.steps && routeData.steps.length > 0 && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden mt-2">
+                      <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px] text-blue-600">directions_car</span>
+                        <strong className="text-[12px] uppercase tracking-wider text-slate-700">Turn-by-Turn GPS</strong>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto p-1 divide-y divide-slate-100">
+                        {routeData.steps.map((step: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 hover:bg-slate-100 transition-colors rounded-lg">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-[14px] text-blue-600">
+                                {step.instruction.toLowerCase().includes('left') ? 'turn_left' : 
+                                 step.instruction.toLowerCase().includes('right') ? 'turn_right' : 
+                                 step.instruction.toLowerCase().includes('roundabout') ? 'roundabout_right' : 'straight'}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-medium text-slate-800 truncate">{step.instruction}</div>
+                              <div className="text-[11px] text-slate-500 font-mono mt-0.5">{step.distance_text}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Turn-by-Turn GPS Steps */}
-                <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/20 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold uppercase text-[10px] text-gray-500 block">
-                      {activeSos.status === 'redirected' ? 'Updated GPS Route to Partner Hospital' : 'Turn-by-Turn GPS Directions'}
-                    </span>
-                    {activeSos.status === 'redirected' && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                        Live Route Updated
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 text-[11px]">
-                    {activeSos.status === 'redirected' ? (
-                      <>
-                        <div className="flex items-center gap-2 text-on-surface font-semibold text-amber-800">
-                          <span className="material-symbols-outlined text-amber-600 text-[16px]">alt_route</span>
-                          <span>Rerouted from primary hospital due to capacity/specialty</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-on-surface">
-                          <span className="material-symbols-outlined text-primary text-[16px]">turn_left</span>
-                          <span>Take NH-48 Express lane towards {activeSos.redirectedHospitalName || 'Partner Hospital'} (2.4 km)</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-on-surface font-bold text-amber-900">
-                          <span className="material-symbols-outlined text-error text-[16px]">local_hospital</span>
-                          <span>Arrive at {activeSos.redirectedHospitalName} • Proceed to {activeSos.bedNo}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 text-on-surface">
-                          <span className="material-symbols-outlined text-primary text-[16px]">turn_right</span>
-                          <span>Head East on Mathura Road towards Ring Road Flyover (400m)</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-on-surface">
-                          <span className="material-symbols-outlined text-primary text-[16px]">straight</span>
-                          <span>Take Left Slip Road into Hospital Emergency Lane (1.1 km)</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-on-surface font-bold">
-                          <span className="material-symbols-outlined text-error text-[16px]">location_on</span>
-                          <span>Arrive at ER Gate #2 Trauma Bay (300m)</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
 
                 {/* Actions */}
                 <div className="flex gap-2">
@@ -792,8 +795,9 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
               {triageResult && (
                 <div className={`p-3 rounded-xl border space-y-1.5 animate-in fade-in ${
                   triageResult.input_intent === 'NON_MEDICAL' ? 'bg-gray-50 border-gray-300' :
-                  triageResult.level === 'Emergency' ? 'bg-red-50 border-red-300' :
-                  triageResult.level === 'Urgent' ? 'bg-amber-50 border-amber-300' :
+                  triageResult.severity === 'EMERGENCY' ? 'bg-red-50 border-red-300' :
+                  triageResult.severity === 'HIGH' ? 'bg-orange-50 border-orange-300' :
+                  triageResult.severity === 'MODERATE' ? 'bg-amber-50 border-amber-300' :
                   'bg-green-50 border-green-300'
                 }`}>
                   <div className="flex justify-between items-center">
@@ -803,12 +807,13 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
                     </span>
                     <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase ${
                       triageResult.input_intent === 'NON_MEDICAL' ? 'bg-gray-200 text-gray-700' :
-                      triageResult.level === 'Emergency' ? 'bg-red-500 text-white animate-pulse' :
-                      triageResult.level === 'Urgent' ? 'bg-amber-100 text-amber-800' :
+                      triageResult.severity === 'EMERGENCY' ? 'bg-red-500 text-white animate-pulse' :
+                      triageResult.severity === 'HIGH' ? 'bg-orange-100 text-orange-800' :
+                      triageResult.severity === 'MODERATE' ? 'bg-amber-100 text-amber-800' :
                       'bg-green-100 text-green-800'
                     }`}>
                       {triageResult.input_intent === 'NON_MEDICAL' ? 'Non-Medical' :
-                        <>{triageResult.level === 'Emergency' ? '🚨 ' : ''}{triageResult.level} Priority</>
+                        <>{triageResult.severity === 'EMERGENCY' ? '🚨 ' : ''}{triageResult.severity} PRIORITY</>
                       }
                     </span>
                   </div>
@@ -883,13 +888,16 @@ export const PatientModals: React.FC<PatientModalsProps> = ({
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onShowToast(`Navigating to ${h.name}`)}
-                    className="p-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-container"
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(h.address || h.name)}&travelmode=driving&dir_action=navigate`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-container flex items-center justify-center"
+                    title={`Start Live Driving Navigation to ${h.name}`}
                   >
                     <span className="material-symbols-outlined text-[16px]">directions</span>
-                  </button>
+                  </a>
                 </div>
               ))}
             </div>

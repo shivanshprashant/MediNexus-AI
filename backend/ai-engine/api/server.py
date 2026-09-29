@@ -24,7 +24,7 @@ app = FastAPI(
 # Enable CORS for local React UI & Admin Portal
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

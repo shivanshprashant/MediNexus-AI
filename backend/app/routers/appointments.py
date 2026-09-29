@@ -42,6 +42,14 @@ async def create_appointment(
     target_patient_id = req.patient_id or patient_id or "pt-demo-01"
     target_doctor_id = req.doctor_id
 
+    from datetime import datetime
+    try:
+        appt_date = datetime.strptime(req.date, "%Y-%m-%d").date()
+        if appt_date < datetime.today().date():
+            raise HTTPException(status_code=400, detail="Appointments cannot be scheduled in the past.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
     if not pool:
         return AppointmentSchema(
             id=apt_id,

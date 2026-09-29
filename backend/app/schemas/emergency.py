@@ -70,7 +70,7 @@ class SymptomAnalysisResponse(BaseModel):
     severity: SeverityType
     level: Literal['Routine', 'Urgent', 'Emergency']
     recommendation: str
-    emergency_triggered: bool
+    emergency: bool
     required_care: str
     ai_summary: str
     event_type: Optional[str] = None

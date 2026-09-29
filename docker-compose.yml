@@ -14,14 +14,30 @@ services:
     networks:
       - medinexus_network
 
+  ai-engine:
+    build:
+      context: ./backend
+      dockerfile: ./ai-engine/Dockerfile
+    container_name: medinexus_ai_engine
+    restart: always
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8080:8080"
+    networks:
+      - medinexus_network
+
   backend:
     build: ./backend
     container_name: medinexus_backend
     restart: always
+    env_file:
+      - ./backend/.env
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://admin:securepassword123@db:5432/medinexus
+      - AI_ENGINE_URL=http://ai-engine:8080
     depends_on:
       - db
     networks:
@@ -42,14 +58,18 @@ services:
       - medinexus_network
 
   admin_frontend:
-    build: ./frontend/admin-portal
+    build: ./frontend/admins-portal
+    container_name: medinexus-ai-admin_frontend-1
+    command: sh -c "rm -rf node_modules package-lock.json && npm install && npm run dev"
     ports:
       - "3001:3001"
     volumes:
-      - /app/node_modules
+      - ./frontend/admins-portal:/app
+      - admins_node_modules:/app/node_modules
 
 volumes:
   postgres_data:
+  admins_node_modules:
 
 networks:
   medinexus_network:

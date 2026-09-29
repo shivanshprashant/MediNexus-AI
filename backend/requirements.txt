@@ -6,8 +6,13 @@ pydantic-settings
 python-dotenv
 pyJWT
 passlib
-bcrypt
+bcrypt==3.2.2
 sse-starlette
 python-multipart
 httpx
 openai
+email-validator
+slowapi
+googlemaps
+twilio
+sendgrid

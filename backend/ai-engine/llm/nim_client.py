@@ -8,12 +8,10 @@ from openai import OpenAI, APIStatusError, APIConnectionError, RateLimitError
 load_dotenv()
 
 # Get NVIDIA API key
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", "placeholder"))
 
-if not NVIDIA_API_KEY:
-    raise ValueError(
-        "NVIDIA_API_KEY is not set. Please check your .env file."
-    )
+if NVIDIA_API_KEY == "placeholder":
+    print("WARNING: NVIDIA_API_KEY is not set. API calls will fail and use graceful fallback.", flush=True)
 
 # Create NVIDIA API client
 client = OpenAI(

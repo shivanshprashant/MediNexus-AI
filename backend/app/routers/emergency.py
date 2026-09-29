@@ -18,10 +18,12 @@ from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(prefix="/emergency", tags=["Emergency / SOS"])
 
+from app.core.deps import get_current_user, get_optional_user
+
 @router.post("/sos", response_model=EmergencyRequestSchema)
 async def trigger_emergency_sos(
     req: EmergencySOSCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user: Optional[dict] = Depends(get_optional_user),
     pool: asyncpg.Pool = Depends(get_db_pool)
 ):
     emergency_id = f"emg-{uuid.uuid4().hex[:8]}"
@@ -65,13 +67,10 @@ async def trigger_emergency_sos(
                     f"%{req.patient_name.strip()}%"
                 )
 
-            # 3. Try to resolve patient from authorization header if present
-            if not resolved_patient and authorization and authorization.startswith("Bearer "):
-                from app.core.security import decode_access_token
-                tok = authorization.split(" ")[1]
-                payload = decode_access_token(tok)
-                if payload and "sub" in payload:
-                    sub = payload["sub"]
+            # 3. Try to resolve patient from authenticated user session
+            if not resolved_patient and user:
+                sub = user.get("user_id")
+                if sub:
                     resolved_patient = await conn.fetchrow(
                         "SELECT * FROM patients WHERE user_id = $1 OR id = $1", sub
                     )
@@ -118,9 +117,9 @@ async def trigger_emergency_sos(
         if patient_lat and patient_lng:
             patient_loc = f"GPS: {patient_lat:.4f}, {patient_lng:.4f}"
         else:
-            patient_loc = "B-42, Sector 62, Noida, Uttar Pradesh 201309"
-            patient_lat = 28.6280
-            patient_lng = 77.3649
+            patient_loc = "Bhopal, Madhya Pradesh"
+            patient_lat = 23.2599
+            patient_lng = 77.4126
 
     if patient_lat and patient_lng:
         maps_link = f"https://www.google.com/maps/dir/?api=1&destination={patient_lat},{patient_lng}"
@@ -308,7 +307,7 @@ async def list_emergency_requests(
                 patientLocation=r.get('patient_location'),
                 patientLatitude=r.get('patient_latitude'),
                 patientLongitude=r.get('patient_longitude'),
-                mapsLink=r.get('maps_link') or (f"https://www.google.com/maps/dir/?api=1&destination={r.get('patient_latitude')},{r.get('patient_longitude')}" if r.get('patient_latitude') else (f"https://www.google.com/maps/dir/?api=1&destination=28.6280,77.3649")),
+                mapsLink=r.get('maps_link') or (f"https://www.google.com/maps/dir/?api=1&destination={r.get('patient_latitude')},{r.get('patient_longitude')}" if r.get('patient_latitude') else (f"https://www.google.com/maps/dir/?api=1&destination=23.0775,76.8513")),
             ))
         return results
 
@@ -458,7 +457,7 @@ async def update_emergency_status(
             patientLocation=updated.get('patient_location'),
             patientLatitude=updated.get('patient_latitude'),
             patientLongitude=updated.get('patient_longitude'),
-            mapsLink=updated.get('maps_link') or (f"https://www.google.com/maps/dir/?api=1&destination={updated.get('patient_latitude')},{updated.get('patient_longitude')}" if updated.get('patient_latitude') else (f"https://www.google.com/maps/dir/?api=1&destination=28.6280,77.3649")),
+            mapsLink=updated.get('maps_link') or (f"https://www.google.com/maps/dir/?api=1&destination={updated.get('patient_latitude')},{updated.get('patient_longitude')}" if updated.get('patient_latitude') else (f"https://www.google.com/maps/dir/?api=1&destination=23.0775,76.8513")),
         )
 
 @router.post("/requests/resolve-active")

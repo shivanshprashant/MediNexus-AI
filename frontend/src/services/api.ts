@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://127.0.0.1:8000/api';
+export const API_BASE_URL = typeof window !== 'undefined' ? `http://${window.location.hostname}:8000/api` : 'http://127.0.0.1:8000/api';
 
 export function getAuthToken(): string | null {
   if (typeof window !== 'undefined') {
@@ -386,6 +386,15 @@ export async function fetchHospitalsApi() {
     console.warn('API fetchHospitals error:', err);
     return null;
   }
+}
+
+export async function calculateRouteApi(origin: string, destination: string) {
+  // Mock function for now to prevent compilation errors
+  return {
+    distance: "10 km",
+    duration: "20 mins",
+    routePoints: []
+  };
 }
 
 export async function fetchHospitalDetailsApi(hospitalId?: string) {
