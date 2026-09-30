@@ -4,7 +4,7 @@
 
 MediNexus AI is a comprehensive healthcare ecosystem designed to connect patients, doctors, and multiple hospitals through an intelligent, AI-assisted workflow. It streamlines symptom analysis, urgency assessment, and emergency routing to ensure patients receive the right care at the right time.
 
-## 🌟 Core Features
+##  Core Features
 
 - **AI-Assisted Triage:** Analyzes patient symptoms (text or voice) to determine severity and recommend healthcare pathways.
 - **Multi-Hospital Network:** Distinct portals for individual hospitals to manage incoming requests, bed availability, and staff.
@@ -13,7 +13,7 @@ MediNexus AI is a comprehensive healthcare ecosystem designed to connect patient
 
 ---
 
-## 🏗️ Architecture & Microservices
+##  Architecture & Microservices
 
 This project is built using a modern microservices architecture:
 
@@ -25,7 +25,7 @@ This project is built using a modern microservices architecture:
 
 ---
 
-## 🚀 Local Development Setup
+##  Local Development Setup
 
 This repository utilizes Docker Compose to orchestrate our microservices. **Do not install Node or Python on your local machines.** Docker will handle all dependencies.
 
@@ -53,7 +53,7 @@ Once the containers are running, you can access the services at the following lo
 
 ---
 
-## 🔒 Git Workflow (Strict)
+##  Git Workflow (Strict)
 1. **Do not push directly to main.**
 2. Create a branch for your feature: 
 ```bash  
